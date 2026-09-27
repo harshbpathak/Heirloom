@@ -19,6 +19,7 @@ INTENT_PATTERN = re.compile(
 # "note" in prose while still catching NOTE: tags).
 UPPER_ONLY = {"NOTE", "WHY", "XXX", "IMPORTANT"}
 
+# DO NOT add new markers here without updating the spec (F1 §5) and tests.
 WARNING_MARKERS = ("DO NOT", "HACK", "FIXME", "XXX", "WARNING")
 
 COMMENT_PREFIXES = {
