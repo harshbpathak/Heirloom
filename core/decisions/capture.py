@@ -105,7 +105,7 @@ def parse_decision_record(text: str) -> DecisionRecord | None:
     if not isinstance(front, dict) or not front.get("title"):
         return None
 
-    body = text[match.end():]
+    body = text[match.end() :]
     sections = _split_sections(body)
     raw_date = front.get("date")
     if isinstance(raw_date, date):
@@ -138,7 +138,7 @@ def _split_sections(body: str) -> dict[str, str]:
     matches = list(_SECTION_RE.finditer(body))
     for i, m in enumerate(matches):
         end = matches[i + 1].start() if i + 1 < len(matches) else len(body)
-        sections[m.group(1).strip().lower()] = body[m.end():end].strip()
+        sections[m.group(1).strip().lower()] = body[m.end() : end].strip()
     return sections
 
 
