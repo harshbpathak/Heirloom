@@ -53,7 +53,9 @@ def get_engine(repo_id: str, db_dir: Path | None = None, create: bool = False) -
 
 
 @contextmanager
-def session_for(repo_id: str, db_dir: Path | None = None, create: bool = False) -> Iterator[Session]:
+def session_for(
+    repo_id: str, db_dir: Path | None = None, create: bool = False
+) -> Iterator[Session]:
     """Context manager yielding a session bound to the repo's database."""
     engine = get_engine(repo_id, db_dir, create=create)
     factory = sessionmaker(bind=engine, future=True, expire_on_commit=False)
