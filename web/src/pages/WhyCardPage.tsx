@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { api } from '../api';
-import { ActivityChart } from '../components/ActivityChart';
 import { BusFactorBadge } from '../components/BusFactorBadge';
 import { FileTree } from '../components/FileTree';
 import { WhyCardView } from '../components/WhyCardView';
@@ -23,22 +22,50 @@ export function WhyCardPage() {
   return (
     <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
       <aside className="card max-h-[75vh] overflow-y-auto" aria-label="File tree">
-        {tree.data ? (
+        {tree.isLoading && (
+          <div className="space-y-1.5 p-1">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="skeleton h-4" style={{ width: `${55 + (i % 4) * 10}%` }} />
+            ))}
+          </div>
+        )}
+        {tree.error && (
+          <p className="text-sm text-red-600" role="alert">
+            Could not load file tree: {(tree.error as Error).message}
+          </p>
+        )}
+        {tree.data && (
           <FileTree
             node={tree.data}
             selected={path}
             onSelect={(p) => setParams({ path: p })}
           />
-        ) : (
-          <p className="text-sm text-gray-500">Loading tree…</p>
         )}
       </aside>
       <section>
-        {!path && <p className="text-gray-500">Pick a file from the tree to see its Why Card.</p>}
+        {!path && (
+          <p className="text-gray-500">Pick a file from the tree to see its Why Card.</p>
+        )}
+        {card.isLoading && path && (
+          <div className="space-y-4">
+            <div className="skeleton h-6 w-2/3" />
+            <div className="card space-y-2">
+              <div className="skeleton h-4 w-1/3" />
+              <div className="skeleton h-16 w-full" />
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="card"><div className="skeleton h-32 w-full" /></div>
+              <div className="card"><div className="skeleton h-32 w-full" /></div>
+            </div>
+          </div>
+        )}
         {card.error && (
-          <p role="alert" className="text-red-600">
-            {(card.error as Error).message}
-          </p>
+          <div role="alert" className="card border-red-300 dark:border-red-800">
+            <p className="font-medium text-red-700 dark:text-red-400">Failed to load Why Card</p>
+            <p className="mt-1 text-sm text-red-600 dark:text-red-300">
+              {(card.error as Error).message}
+            </p>
+          </div>
         )}
         {card.data && <WhyCardBody repoId={repoId} card={card.data} />}
       </section>
@@ -62,16 +89,18 @@ function WhyCardBody({ repoId, card }: { repoId: string; card: import('../api').
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <h1 className="break-all font-mono text-lg font-bold">{card.path}</h1>
-        <span className="text-sm text-gray-500">
-          {card.language ?? 'unknown language'} · {card.loc} LOC
-        </span>
-        {card.is_entry_point && (
-          <span className="rounded bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-900 dark:bg-blue-950 dark:text-blue-200">
-            entry point
-          </span>
-        )}
+      <div className="flex flex-wrap items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <h1 className="break-all font-mono text-lg font-bold">{card.path}</h1>
+          <p className="mt-0.5 text-sm text-gray-500">
+            {card.language ?? 'unknown language'} · {card.loc} LOC
+            {card.is_entry_point && (
+              <span className="ml-2 rounded bg-brand-100 px-2 py-0.5 text-xs font-medium text-brand-700 dark:bg-brand-500/20 dark:text-brand-400">
+                entry point
+              </span>
+            )}
+          </p>
+        </div>
         <BusFactorBadge busFactor={card.bus_factor} atRisk={card.at_risk} />
       </div>
 
@@ -93,13 +122,6 @@ function WhyCardBody({ repoId, card }: { repoId: string; card: import('../api').
       {showForm && <AddDecisionForm repoId={repoId} path={card.path} onDone={() => setShowForm(false)} />}
 
       <WhyCardView card={card} />
-
-      {card.activity.length > 0 && (
-        <div className="card">
-          <h2 className="mb-2 text-sm font-semibold">Commits per month</h2>
-          <ActivityChart activity={card.activity} />
-        </div>
-      )}
     </div>
   );
 }

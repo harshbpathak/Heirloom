@@ -10,7 +10,7 @@ import threading
 import uuid
 from datetime import datetime
 
-from sqlalchemy import create_engine, select
+from sqlalchemy import Engine, create_engine, select
 from sqlalchemy.orm import Session
 
 from core.config import Settings, get_settings
@@ -20,10 +20,10 @@ from core.models.schemas import JobStatus
 from core.timeutil import utcnow
 
 _lock = threading.Lock()
-_engines: dict[str, object] = {}
+_engines: dict[str, Engine] = {}
 
 
-def _jobs_engine(settings: Settings):
+def _jobs_engine(settings: Settings) -> Engine:
     path = settings.heirloom_home / "jobs.sqlite"
     key = str(path)
     with _lock:
@@ -137,7 +137,7 @@ def list_jobs_for_repo(repo_id: str, settings: Settings | None = None) -> list[J
     """All jobs for a repo, newest first."""
     settings = settings or get_settings()
     with Session(_jobs_engine(settings)) as session:
-        jobs = session.scalars(select(Job).where(Job.repo_id == repo_id)).all()
+        jobs = list(session.scalars(select(Job).where(Job.repo_id == repo_id)).all())
         jobs.sort(key=lambda j: j.started_at or datetime.min, reverse=True)
         return [
             JobStatus(

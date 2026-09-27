@@ -6,13 +6,15 @@ import json
 import re
 from pathlib import Path
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from core.errors import LLMError
-from core.ingest.comments import extract_intent_comments
+from core.ingest.comments import WARNING_MARKERS, extract_intent_comments
 from core.llm.prompts_loader import load_prompt
 from core.llm.provider import LLMProvider, cached_complete_json
-from core.models.schemas import ActivityPoint, AgentContext, WarningItem, WhyCard
+from core.models.db_models import Evidence, File
+from core.models.schemas import ActivityPoint, AgentContext, CompactDecision, WarningItem, WhyCard
 from core.services.queries import (
     activity_for_file,
     decisions_for_file,
@@ -36,7 +38,11 @@ def build_why_card(
     decisions = decisions_for_file(session, repo_id, path)
     holders = holders_for_file(session, file_row)
     impact = impact_for_file(session, repo_id, path, limit=10)
-    warnings = _warnings(repo_path, path, file_row.language) if repo_path else []
+    warnings = (
+        _warnings(repo_path, path, file_row.language)
+        if repo_path
+        else _warnings_from_evidence(session, file_row)
+    )
     activity = [ActivityPoint(**a) for a in activity_for_file(session, file_row)]
 
     summary, summary_source = _summary(session, file_row, repo_path, provider, decisions)
@@ -71,7 +77,47 @@ def _warnings(repo_path: Path, path: str, language: str | None) -> list[WarningI
     ]
 
 
-def _summary(session, file_row, repo_path, provider, decisions) -> tuple[str, str]:
+def _warnings_from_evidence(session: Session, file_row: File) -> list[WarningItem]:
+    """Rebuild warnings from stored code_comment evidence when the source is absent.
+
+    Each code_comment evidence row has ``ref = "path:line"`` and ``text`` is the
+    comment text. We filter to warning-grade markers so the result matches what
+    ``_warnings`` would return when the file is present.
+    """
+    # Collect evidence ids linked to decisions that touch this file, then also
+    # grab all code_comment evidence whose ref starts with this file's path.
+    # The simplest approach: query all code_comment evidence for the repo whose
+    # ref starts with "<path>:" — no join needed.
+    prefix = f"{file_row.path}:"
+    rows = session.scalars(
+        select(Evidence).where(
+            Evidence.repo_id == file_row.repo_id,
+            Evidence.type == "code_comment",
+            Evidence.ref.like(f"{file_row.path}:%"),
+        )
+    ).all()
+    result: list[WarningItem] = []
+    for ev in rows:
+        upper = ev.text.upper()
+        if not any(marker in upper for marker in WARNING_MARKERS):
+            continue
+        # ref is "path:line"
+        ref_suffix = ev.ref[len(prefix) :]
+        try:
+            line = int(ref_suffix)
+        except ValueError:
+            line = 0
+        result.append(WarningItem(line=line, text=ev.text[:500]))
+    return result
+
+
+def _summary(
+    session: Session,
+    file_row: File,
+    repo_path: Path | None,
+    provider: LLMProvider | None,
+    decisions: list[CompactDecision],
+) -> tuple[str, str]:
     """File summary: cached, LLM if available, else header comment, else honest 'none'."""
     if file_row.summary and file_row.summary_source != "none":
         return file_row.summary, file_row.summary_source

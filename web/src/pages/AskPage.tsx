@@ -45,7 +45,7 @@ export function AskPage() {
       <div className="space-y-3" aria-live="polite">
         {history.map((entry, i) => (
           <div key={i} className="space-y-2">
-            <p className="ml-auto w-fit max-w-[85%] rounded-lg bg-blue-600 px-3 py-2 text-white">
+            <p className="ml-auto w-fit max-w-[85%] rounded-lg bg-brand-500 px-3 py-2 text-white">
               {entry.question}
             </p>
             {entry.answer ? (

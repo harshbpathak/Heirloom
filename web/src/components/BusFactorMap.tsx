@@ -4,10 +4,10 @@ import type { TreeNode } from '../api';
 
 /** Colors match the tailwind bus-factor scale; labels are always shown too. */
 const COLORS: Record<string, string> = {
-  bf1: '#dc2626',
-  bf2: '#d97706',
-  bf3: '#16a34a',
-  na: '#6b7280',
+  bf1: '#c92a2a',
+  bf2: '#e67700',
+  bf3: '#2f9e44',
+  na: '#868e96',
   highlight: '#2563eb',
 };
 
@@ -44,7 +44,10 @@ export function BusFactorMap({
   onSelectFile: (path: string) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [hover, setHover] = useState<FileLeaf | null>(null);
+  // tooltip position in pixels relative to container
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
   const [zoomRoot, setZoomRoot] = useState<string | null>(null);
   const width = 900;
   const height = 520;
@@ -69,6 +72,22 @@ export function BusFactorMap({
     return d3.treemap<TreeNode>().size([width, height]).paddingInner(1).paddingTop(14)(hierarchy);
   }, [tree, zoomRoot]);
 
+  /** Collect riskiest files for the accessible table. */
+  const riskiestFiles = useMemo(() => {
+    return layout
+      .leaves()
+      .filter((n) => n.data.type === 'file')
+      .map((n) => n.data as unknown as FileLeaf)
+      .filter((f) => f.bus_factor === 1 || f.at_risk)
+      .sort((a, b) => {
+        const riskA = a.at_risk ? 0 : 1;
+        const riskB = b.at_risk ? 0 : 1;
+        if (riskA !== riskB) return riskA - riskB;
+        return (b.loc ?? 0) - (a.loc ?? 0);
+      })
+      .slice(0, 10);
+  }, [layout]);
+
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -84,7 +103,7 @@ export function BusFactorMap({
         ctx.strokeRect(node.x0, node.y0, w, h);
         if (w > 40 && h > 14) {
           ctx.fillStyle = '#6b7280';
-          ctx.font = '10px sans-serif';
+          ctx.font = '10px Inter, sans-serif';
           ctx.fillText(d.name, node.x0 + 3, node.y0 + 10, w - 6);
         }
       }
@@ -110,7 +129,7 @@ export function BusFactorMap({
       }
       if (w > 60 && h > 16) {
         ctx.fillStyle = 'white';
-        ctx.font = '10px sans-serif';
+        ctx.font = '10px Inter, sans-serif';
         ctx.fillText(leaf.name, node.x0 + 3, node.y0 + 12, w - 6);
       }
     }
@@ -118,13 +137,23 @@ export function BusFactorMap({
 
   useEffect(() => draw(), [draw]);
 
-  const leafAt = (evt: React.MouseEvent): FileLeaf | null => {
-    const rect = canvasRef.current!.getBoundingClientRect();
-    const x = ((evt.clientX - rect.left) / rect.width) * width;
-    const y = ((evt.clientY - rect.top) / rect.height) * height;
+  const leafAt = (evt: React.MouseEvent): { leaf: FileLeaf; canvasX: number; canvasY: number } | null => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = width / rect.width;
+    const scaleY = height / rect.height;
+    const x = (evt.clientX - rect.left) * scaleX;
+    const y = (evt.clientY - rect.top) * scaleY;
     for (const node of layout.leaves()) {
       if (x >= node.x0 && x <= node.x1 && y >= node.y0 && y <= node.y1) {
-        return node.data.type === 'file' ? (node.data as unknown as FileLeaf) : null;
+        if (node.data.type !== 'file') return null;
+        return {
+          leaf: node.data as unknown as FileLeaf,
+          // position relative to container div in CSS pixels
+          canvasX: evt.clientX - rect.left,
+          canvasY: evt.clientY - rect.top,
+        };
       }
     }
     return null;
@@ -148,14 +177,14 @@ export function BusFactorMap({
         <Legend color={COLORS.na} label="not analyzed (grey)" />
         <span className="text-gray-500">striped = at risk</span>
         {filterAuthor && (
-          <span className="font-medium text-blue-600 dark:text-blue-400">
-            “If {filterAuthor} left”: blue = they own &gt;40%
+          <span className="font-medium text-brand-600 dark:text-brand-500">
+            If {filterAuthor} left: blue = they own &gt;40%
           </span>
         )}
         <span className="ml-auto flex gap-2">
           {zoomRoot && (
             <button className="btn" onClick={() => setZoomRoot(null)}>
-              ⤴ Zoom out
+              ↩ Zoom out
             </button>
           )}
           <button className="btn" onClick={exportPng}>
@@ -163,37 +192,119 @@ export function BusFactorMap({
           </button>
         </span>
       </div>
-      <canvas
-        ref={canvasRef}
-        width={width}
-        height={height}
-        role="img"
-        aria-label="Treemap of files sized by lines of code and colored by bus factor"
-        className="w-full cursor-pointer rounded border border-gray-200 dark:border-gray-800"
-        onMouseMove={(e) => setHover(leafAt(e))}
-        onMouseLeave={() => setHover(null)}
-        onClick={(e) => {
-          const leaf = leafAt(e);
-          if (leaf) onSelectFile(leaf.path);
-        }}
-        onDoubleClick={(e) => {
-          const leaf = leafAt(e);
-          if (leaf) setZoomRoot(leaf.path.split('/')[0] ?? null);
-        }}
-      />
-      <div className="mt-1 min-h-[1.5rem] text-xs text-gray-600 dark:text-gray-300" aria-live="polite">
-        {hover ? (
-          <>
-            <strong>{hover.path}</strong> · {hover.loc} LOC · bus factor{' '}
-            {hover.bus_factor ?? 'unknown'}
-            {hover.at_risk ? ' · AT RISK' : ''}
-            {hover.holders?.[0] &&
-              ` · top owner ${hover.holders[0].name} (${Math.round(hover.holders[0].ownership * 100)}%)`}
-          </>
-        ) : (
-          'Hover a rectangle for details; click to open its Why Card; double-click to zoom into a top-level folder.'
+
+      {/* Canvas wrapped in a relative container so the tooltip can be positioned */}
+      <div ref={containerRef} className="relative">
+        <canvas
+          ref={canvasRef}
+          width={width}
+          height={height}
+          role="img"
+          aria-label="Treemap of files sized by lines of code and colored by bus factor"
+          className="w-full cursor-pointer rounded-lg border border-gray-200 dark:border-gray-800"
+          onMouseMove={(e) => {
+            const hit = leafAt(e);
+            if (hit) {
+              setHover(hit.leaf);
+              setTooltipPos({ x: hit.canvasX, y: hit.canvasY });
+            } else {
+              setHover(null);
+              setTooltipPos(null);
+            }
+          }}
+          onMouseLeave={() => {
+            setHover(null);
+            setTooltipPos(null);
+          }}
+          onClick={(e) => {
+            const hit = leafAt(e);
+            if (hit) onSelectFile(hit.leaf.path);
+          }}
+          onDoubleClick={(e) => {
+            const hit = leafAt(e);
+            if (hit) setZoomRoot(hit.leaf.path.split('/')[0] ?? null);
+          }}
+        />
+
+        {/* Floating cursor tooltip */}
+        {hover && tooltipPos && (
+          <div
+            role="tooltip"
+            className="pointer-events-none absolute z-10 max-w-[260px] rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs shadow-lg dark:border-gray-700 dark:bg-gray-900"
+            style={{
+              left: Math.min(tooltipPos.x + 12, (containerRef.current?.offsetWidth ?? 900) - 270),
+              top: Math.max(tooltipPos.y - 48, 4),
+            }}
+          >
+            <p className="font-mono font-medium">{hover.path}</p>
+            <p className="mt-0.5 text-gray-500">
+              {hover.loc} LOC · bus factor {hover.bus_factor ?? 'unknown'}
+              {hover.at_risk ? ' · AT RISK' : ''}
+            </p>
+            {hover.holders?.[0] && (
+              <p className="text-gray-500">
+                top owner {hover.holders[0].name} ({Math.round(hover.holders[0].ownership * 100)}%)
+              </p>
+            )}
+          </div>
         )}
       </div>
+
+      {/* Keyboard-accessible table of the riskiest files */}
+      {riskiestFiles.length > 0 && (
+        <details className="mt-3">
+          <summary className="cursor-pointer text-xs font-medium text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200">
+            Riskiest files ({riskiestFiles.length} shown)
+          </summary>
+          <div className="mt-2 overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-800">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-gray-200 text-left dark:border-gray-800">
+                  <th className="px-3 py-1.5 font-medium">File</th>
+                  <th className="px-3 py-1.5 font-medium">LOC</th>
+                  <th className="px-3 py-1.5 font-medium">Bus factor</th>
+                  <th className="px-3 py-1.5 font-medium">Status</th>
+                  <th className="px-3 py-1.5 font-medium">Top owner</th>
+                </tr>
+              </thead>
+              <tbody>
+                {riskiestFiles.map((f) => (
+                  <tr
+                    key={f.path}
+                    tabIndex={0}
+                    className="cursor-pointer border-b border-gray-100 hover:bg-gray-50 focus-visible:bg-brand-50 dark:border-gray-800 dark:hover:bg-gray-800 dark:focus-visible:bg-brand-500/10"
+                    onClick={() => onSelectFile(f.path)}
+                    onKeyDown={(e) => e.key === 'Enter' && onSelectFile(f.path)}
+                  >
+                    <td className="px-3 py-1.5 font-mono">{f.path}</td>
+                    <td className="px-3 py-1.5">{f.loc}</td>
+                    <td className="px-3 py-1.5">
+                      <span
+                        className="rounded px-1.5 py-0.5 text-white"
+                        style={{ backgroundColor: colorFor(f, null) }}
+                      >
+                        {f.bus_factor ?? '?'}
+                      </span>
+                    </td>
+                    <td className="px-3 py-1.5">
+                      {f.at_risk ? (
+                        <span className="font-semibold text-bf1">AT RISK</span>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-1.5 text-gray-500">
+                      {f.holders?.[0]
+                        ? `${f.holders[0].name} (${Math.round(f.holders[0].ownership * 100)}%)`
+                        : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      )}
     </div>
   );
 }

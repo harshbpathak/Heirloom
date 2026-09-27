@@ -11,19 +11,19 @@ export function BusFactorBadge({
 }) {
   if (busFactor === null || busFactor === undefined || busFactor === 0) {
     return (
-      <span className="inline-flex items-center rounded bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-200">
-        bus factor: unknown (not analyzed)
+      <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+        bus factor: unknown
       </span>
     );
   }
   const cls =
     busFactor === 1
-      ? 'bg-red-100 text-red-900 dark:bg-red-950 dark:text-red-200'
+      ? 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300'
       : busFactor === 2
-        ? 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200'
-        : 'bg-green-100 text-green-900 dark:bg-green-950 dark:text-green-200';
+        ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+        : 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-300';
   return (
-    <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium ${cls}`}>
+    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${cls}`}>
       bus factor: {busFactor}
       {atRisk && <strong aria-label="at risk">⚠ AT RISK</strong>}
     </span>

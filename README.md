@@ -1,479 +1,137 @@
 # Heirloom
 
-> **Why** code is the way it is — **who** still understands it — **what breaks** if you change it.
+**Heirloom tells you why code is the way it is, who still understands it, and what breaks if you change it, so knowledge does not leave when an engineer does.**
 
-Heirloom analyses a git repository and builds a persistent knowledge base that answers the three questions developers ask every day before touching unfamiliar code. It runs as a CLI, a REST API, a React web UI, and an MCP server that plugs directly into AI coding assistants.
+It mines a repository's git history, blame, code comments, pull requests and docs into a decision graph. People use it through a web UI and a CLI. AI coding agents (IBM Bob first, then any MCP client) use it through an MCP server, so they read a file's history before they edit it and record new decisions after.
 
----
-
-## Table of Contents
-
-1. [Features](#features)
-2. [Quick Start](#quick-start)
-3. [Installation](#installation)
-4. [Configuration](#configuration)
-5. [CLI Reference](#cli-reference)
-6. [REST API](#rest-api)
-7. [MCP Server](#mcp-server)
-8. [Web UI](#web-ui)
-9. [LLM Integration](#llm-integration)
-10. [Architecture](#architecture)
-11. [Development](#development)
-12. [License](#license)
-
----
+Measured on [pallets/click](https://github.com/pallets/click): Heirloom ingested **2,000 commits in 22 seconds** (clone included, no LLM), found **854 decisions**, and showed that **41.7% of click's 31,919 lines have a bus factor of 1**, with **18 files at risk**.
 
 ## Features
 
-| Feature | Description |
+| | |
 |---|---|
-| **Why Card** | Per-file view of all decisions, reasoning, evidence, warnings, and activity history |
-| **Knowledge Ownership** | Git blame + recency → per-author ownership %; bus-factor flag; at-risk detection |
-| **Impact Analysis** | Ranked list of files most likely to break when a file changes (imports + co-change coupling) |
-| **Onboarding Trail** | Ordered reading path through the codebase for a new developer, optionally topical |
-| **Ask** | Natural-language Q&A over recorded decisions with BM25 retrieval and LLM synthesis |
-| **Record Decision** | Capture design decisions from the CLI, API, web UI, or directly from an AI assistant |
-| **Risk Report** | Repo-wide view of bus-factor-1 files, at-risk files, and knowledge concentration |
-| **Export** | Full knowledge base as Markdown or JSON |
-| **MCP Tools** | 7 tools + 2 resources for AI coding assistants (stdio or HTTP transport) |
-| **Demo Mode** | Read-only mode for presenting or sharing without write access |
+| **Why Card** | One page per file: what it does, the decisions behind it with evidence links, who knows it, what breaks if it changes, DO NOT / HACK warnings, and a commit timeline. Copy it as Markdown or as compact agent context. |
+| **Bus Factor Map** | A treemap of the repo sized by lines and colored by bus factor, with at-risk files striped. The "If this person left" filter shows one person's footprint. Exports to PNG. |
+| **Onboarding Trails** | An ordered reading path, general or by topic, that puts dependencies first. Progress is saved in the browser and the trail exports to Markdown. |
+| **Ask Heirloom** | Questions answered only from recorded decisions, with citations. Without an LLM it returns ranked, cited decisions. |
+| **Decision capture** | Record decisions from the web form, `heirloom decide`, or the MCP tool `record_decision`. Each one is saved as Markdown in `.heirloom/decisions/`, so it lives in git. |
+| **PR guard** | A GitHub Action that comments on each PR with the decisions it may conflict with, bus factor, impacted files outside the PR, and DO NOT comments near changed lines. It updates one comment in place and works on forks with no secrets. |
+| **MCP server** | Seven tools for agents: `ask_why`, `who_knows`, `impact_if_changed`, `onboarding_trail`, `search_decisions`, `record_decision`, `repo_risk_report`. |
 
----
+Everything works offline with zero API keys. Every feature that can use an LLM has a deterministic fallback, and the UI shows "unknown" rather than inventing a value.
 
-## Quick Start
+## Quick start
 
-```bash
-# Install
-pip install -e ".[dev]"
-
-# Ingest a local repo
-heirloom ingest /path/to/your/repo
-
-# Or ingest from GitHub
-heirloom ingest https://github.com/org/repo
-
-# Ask why a file looks the way it does
-heirloom why src/payments/processor.py
-
-# Who knows this file?
-heirloom who src/payments/processor.py
-
-# What breaks if I change it?
-heirloom impact src/payments/processor.py
-
-# Start the web UI + API
-heirloom serve
-```
-
----
-
-## Installation
-
-**Requirements:** Python 3.11+, Node.js 22+ (web UI only), pnpm 10+ (web UI only)
+Requires Python 3.11+, git, Node 20+ and pnpm.
 
 ```bash
-# Clone
-git clone https://github.com/org/heirloom
-cd heirloom
-
-# Python backend
+git clone https://github.com/harshbpathak/Heirloom.git && cd Heirloom
 python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
-pip install -e ".[dev]"
-
-# Web UI (optional)
+.venv/Scripts/pip install -e ".[dev]"      # macOS/Linux: .venv/bin/pip install -e ".[dev]"
 cd web && pnpm install && pnpm build && cd ..
+
+heirloom ingest https://github.com/pallets/click   # or a local path
+heirloom serve                                     # UI and API on http://localhost:8000
 ```
 
-### Docker
+### Without keys (default)
 
-```bash
-docker compose up
+Nothing to configure. Decisions come from the heuristic extractor, summaries from header comments, and Ask returns ranked, cited decisions.
+
+### With keys (optional)
+
+Copy `.env.example` to `.env` and fill in what you have:
+
+- `WATSONX_API_KEY`, `WATSONX_PROJECT_ID` (and optionally `WATSONX_MODEL_ID`) turn on IBM watsonx.ai Granite for decision extraction, file summaries, trail reasons and Ask answers. Install the SDK with `pip install -e ".[watsonx]"`.
+- `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` use any OpenAI-compatible endpoint instead.
+- `GITHUB_TOKEN` adds merged pull requests as evidence.
+
+LLM responses are cached in SQLite, so re-runs cost nothing.
+
+### Demo mode
+
+`HEIRLOOM_DEMO=1` makes the app read-only: it loads existing snapshots and never calls the network.
+
+## CLI
+
+```text
+heirloom ingest <path-or-github-url> [--since DATE] [--max-commits N]
+heirloom why <file>                 # the Why Card in the terminal
+heirloom who <file-or-dir>          # knowledge holders and bus factor
+heirloom impact <file>              # impact set with reasons
+heirloom trail [--topic TEXT]       # onboarding trail
+heirloom ask "<question>"
+heirloom decide "<title>" --files a.py b.py --why "..." [--alternatives "..."]
+heirloom risk                       # repo-wide at-risk report
+heirloom serve [--port 8000]        # API and web UI
+heirloom mcp [--http --port 8765]   # MCP server (stdio by default)
+heirloom export --format md|json
 ```
 
-The API is available at `http://localhost:8000` and the web UI at `http://localhost:5173`.
+Every command accepts `--repo <id-or-path>` and `--json`. Full reference: [docs/cli.md](docs/cli.md).
 
----
-
-## Configuration
-
-Copy `.env.example` to `.env` and fill in the values you need. All variables are optional — Heirloom works without any of them.
-
-| Variable | Default | Description |
-|---|---|---|
-| `HEIRLOOM_HOME` | `~/.heirloom` | Data directory for SQLite databases and repo clones |
-| `HEIRLOOM_MAX_COMMITS` | `2000` | Commit limit per ingest run |
-| `HEIRLOOM_DEMO` | `0` | Set to `1` to enable read-only demo mode |
-| `HEIRLOOM_LOG_JSON` | `0` | Set to `1` for structured JSON log output |
-| `API_PORT` | `8000` | Port for `heirloom serve` |
-| `WEB_PORT` | `5173` | Port for `pnpm dev` |
-| `MCP_HTTP_PORT` | `8765` | Port for `heirloom mcp --http` |
-| `GITHUB_TOKEN` | — | GitHub personal access token; enables PR ingestion |
-| `WATSONX_API_KEY` | — | IBM watsonx.ai API key |
-| `WATSONX_PROJECT_ID` | — | IBM watsonx.ai project ID |
-| `WATSONX_URL` | `https://us-south.ml.cloud.ibm.com` | watsonx.ai endpoint |
-| `WATSONX_MODEL_ID` | `ibm/granite-3-3-8b-instruct` | Model for LLM calls |
-| `LLM_BASE_URL` | — | OpenAI-compatible base URL (alternative to watsonx) |
-| `LLM_API_KEY` | — | API key for the OpenAI-compatible endpoint |
-| `LLM_MODEL` | — | Model name for the OpenAI-compatible endpoint |
-
-### Author alias overrides
-
-To merge git identities that should be the same person, create `.heirloom/aliases.yml` inside the target repo:
-
-```yaml
-"Jane Smith": "jane@old.example.com"
-"Jane S.":    "jane@new.example.com"
-```
-
----
-
-## CLI Reference
-
-All commands accept `--repo <id-or-path>` to target a specific ingested repo. When only one repo has been ingested, `--repo` can be omitted. Every command accepts `--json` to emit machine-readable output.
-
-### `heirloom ingest <source>`
-
-Ingest (or incrementally re-ingest) a repository.
-
-```bash
-heirloom ingest /path/to/repo
-heirloom ingest https://github.com/org/repo
-heirloom ingest https://github.com/org/repo --since 2024-01-01
-heirloom ingest /path/to/repo --max-commits 500
-```
-
-Re-running is incremental: only commits after the last ingested head are processed.
-
----
-
-### `heirloom why <file>`
-
-Print the **Why Card** for a file — summary, decisions, knowledge holders, impact, and warnings.
-
-```bash
-heirloom why src/payments/processor.py
-heirloom why src/payments/processor.py --json
-```
-
----
-
-### `heirloom who <path>`
-
-Knowledge holders and bus factor for a file or directory.
-
-```bash
-heirloom who src/payments/processor.py
-heirloom who src/payments/           # all files under the directory
-```
-
-Output columns: **File**, **Bus factor** (annotated `AT RISK` when the sole owner is inactive), **Holders** (name, ownership %, inactive flag).
-
----
-
-### `heirloom impact <file>`
-
-Files most likely to break if this file changes, with a score and reason.
-
-```bash
-heirloom impact src/payments/processor.py
-heirloom impact src/payments/processor.py --limit 20
-```
-
----
-
-### `heirloom trail`
-
-Generate an onboarding reading trail through the repo.
-
-```bash
-heirloom trail
-heirloom trail --topic "payment processing"
-heirloom trail --max-steps 15 --markdown
-```
-
----
-
-### `heirloom ask <question>`
-
-Ask a natural-language question about the repo. Answers cite recorded decisions.
-
-```bash
-heirloom ask "Why did we move off the old payment gateway?"
-heirloom ask "What is the retry strategy for webhooks?"
-```
-
-Requires an LLM to be configured (see [LLM Integration](#llm-integration)).
-
----
-
-### `heirloom decide <title>`
-
-Record a new design decision. Writes to the SQLite database and to `.heirloom/decisions/NNNN-slug.md` inside the target repo.
-
-```bash
-heirloom decide "Use optimistic locking for inventory" \
-  --files src/inventory/stock.py \
-  --why "Avoids blocking reads under high concurrency; acceptable conflict rate is <0.1%" \
-  --alternatives "Pessimistic locking, queue-based serialisation"
-```
-
-| Option | Description |
-|---|---|
-| `--files` | Repo-relative file paths this decision touches (repeatable) |
-| `--why` | The reasoning (required) |
-| `--alternatives` | Alternatives that were considered |
-| `--author` | Override the author name |
-| `--skill-hash` | SHA-256 of the capturing skill, stored for auditability |
-
----
-
-### `heirloom risk`
-
-Repo-wide at-risk report: bus-factor-1 files, inactive sole owners, knowledge concentration.
-
-```bash
-heirloom risk
-heirloom risk --limit 50
-```
-
----
-
-### `heirloom export`
-
-Export the full knowledge base.
-
-```bash
-heirloom export --format md   # Markdown (default)
-heirloom export --format json
-```
-
----
-
-### `heirloom serve`
-
-Start the API server. Serves the built web UI from `web/dist` when it exists.
-
-```bash
-heirloom serve
-heirloom serve --port 9000
-```
-
----
-
-### `heirloom mcp`
-
-Start the MCP server.
-
-```bash
-heirloom mcp              # stdio (default; use in MCP config)
-heirloom mcp --http       # streamable HTTP on MCP_HTTP_PORT (8765)
-heirloom mcp --http --port 9000
-```
-
----
-
-## REST API
-
-Interactive docs at `http://localhost:8000/api/docs` once the server is running.
-
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/api/health` | Liveness check + active LLM backend |
-| `POST` | `/api/repos` | Start ingestion; returns `repo_id` and `job_id` |
-| `GET` | `/api/repos` | List all ingested repos with stats |
-| `GET` | `/api/jobs/{job_id}` | Poll ingestion job progress |
-| `GET` | `/api/repos/{id}/tree` | Nested file tree with `loc`, `bus_factor`, `at_risk` |
-| `GET` | `/api/repos/{id}/why?path=` | Why Card (`?format=json\|markdown\|agent`) |
-| `GET` | `/api/repos/{id}/who?path=` | Knowledge holders for a file |
-| `GET` | `/api/repos/{id}/impact?path=` | Impact set for a file |
-| `GET` | `/api/repos/{id}/trail` | Onboarding trail (`?topic=&max_steps=`) |
-| `POST` | `/api/repos/{id}/ask` | Q&A with citations (`{"question": "..."}`) |
-| `GET` | `/api/repos/{id}/decisions` | Filterable decision list (`?q=&file=&limit=&offset=`) |
-| `POST` | `/api/repos/{id}/decisions` | Record a manual decision |
-| `GET` | `/api/repos/{id}/risk` | Repo-wide risk report |
-| `GET` | `/api/repos/{id}/people` | Author concentration stats |
-
-All errors return `{"error": {"code": "<code>", "message": "<message>"}}`. HTTP status codes: 404 for not-found, 422 for validation errors, 400 for ingest errors.
-
----
-
-## MCP Server
-
-Heirloom exposes an MCP server that AI coding assistants (Claude, Cursor, etc.) can call directly. Configure it in your assistant's MCP settings:
+## MCP setup
 
 ```json
-{
-  "mcpServers": {
-    "heirloom": {
-      "command": "heirloom",
-      "args": ["mcp"]
-    }
-  }
-}
+{ "mcpServers": { "heirloom": { "command": "heirloom", "args": ["mcp"] } } }
 ```
 
-For HTTP transport (remote agents):
+Run `heirloom ingest .` in your project first. The server picks the repo from `HEIRLOOM_REPO`, then from its working directory. Tool reference and configs for IBM Bob, Claude Desktop, Cursor and VS Code: [docs/mcp.md](docs/mcp.md).
 
-```json
-{
-  "mcpServers": {
-    "heirloom": {
-      "url": "http://localhost:8765/mcp"
-    }
-  }
-}
-```
+## IBM Bob
 
-### Tools
+This repo ships a Bob custom mode and two skills:
 
-| Tool | Arguments | Description |
-|---|---|---|
-| `ask_why` | `path`, `symbol?`, `repo_id?` | Why Card before editing a file |
-| `who_knows` | `path`, `repo_id?` | Ownership %, last active, bus factor |
-| `impact_if_changed` | `path`, `limit?`, `repo_id?` | Ranked impact set with reasons |
-| `onboarding_trail` | `topic?`, `max_steps?`, `repo_id?` | Ordered reading path |
-| `search_decisions` | `query`, `limit?`, `repo_id?` | BM25 search over decisions |
-| `record_decision` | `title`, `files`, `reasoning`, `alternatives?`, `author?`, `skill_hash?`, `repo_id?` | Persist a new design decision |
-| `repo_risk_report` | `limit?`, `repo_id?` | At-risk files + concentration stats |
+- **Archivist** (`.bob/custom_modes.yaml`): a coding mode that never edits blind. It calls `ask_why` and `impact_if_changed` before each edit, stops when a change contradicts a recorded decision, and calls `record_decision` after real design choices.
+- **capture-why** (`.bob/skills/capture-why/`): turns the staged diff into a decision record and stamps it with the SHA-256 of its own `SKILL.md`.
+- **onboard-me** (`.bob/skills/onboard-me/`): walks a newcomer through the first three steps of an onboarding trail.
 
-### Resources
-
-| URI | Description |
-|---|---|
-| `heirloom://repo/{id}/why/{path*}` | Why Card as Markdown |
-| `heirloom://repo/{id}/decisions` | Index of all recorded decisions |
-
-### Repo resolution
-
-When `repo_id` is omitted the server resolves it in this order:
-
-1. `HEIRLOOM_REPO` environment variable
-2. The repo whose id matches the server's working directory
-3. The single ingested repo (error if multiple exist)
-
----
-
-## Web UI
-
-The web UI is a React + TypeScript + Vite application in `web/`. It talks to the REST API.
-
-```bash
-# Development (API must already be running on :8000)
-cd web && pnpm dev
-
-# Production build (served automatically by `heirloom serve`)
-cd web && pnpm build
-```
-
----
-
-## LLM Integration
-
-The LLM is **optional**. Heirloom falls back to heuristics when no LLM is configured:
-
-- **File summaries** fall back to the file's header comment, then `"No summary available"`.
-- **Decision extraction** falls back to keyword-based heuristic extraction.
-- **Ask** requires an LLM; the endpoint returns an empty answer without one.
-- **Onboarding trails** fall back to a score-based ranking without LLM reranking.
-
-### IBM watsonx.ai (recommended)
-
-```bash
-WATSONX_API_KEY=your-key
-WATSONX_PROJECT_ID=your-project-id
-WATSONX_MODEL_ID=ibm/granite-3-3-8b-instruct   # default
-```
-
-### OpenAI-compatible endpoint
-
-```bash
-LLM_BASE_URL=http://localhost:11434/v1   # e.g. Ollama
-LLM_API_KEY=ollama
-LLM_MODEL=llama3
-```
-
-All LLM responses are cached in `llm_cache` keyed by a hash of the prompt + input. Identical requests are served from cache without a network call.
-
----
+`.bob/mcp.json` registers the Heirloom MCP server for Bob. Details: [docs/BOB.md](docs/BOB.md).
 
 ## Architecture
 
+```mermaid
+flowchart LR
+  subgraph Sources
+    G[git log + blame]
+    C[code comments]
+    D[docs and ADRs]
+    P[GitHub PRs]
+  end
+  subgraph core["core/ (all logic)"]
+    I[ingest] --> A[analysis<br/>imports, coupling,<br/>ownership, impact]
+    I --> X[decisions<br/>heuristic or LLM,<br/>dedupe]
+    A --> DB[(SQLite per repo)]
+    X --> DB
+    DB --> S[services<br/>Why Card, Ask,<br/>trails, search]
+  end
+  Sources --> I
+  S --> API[FastAPI] --> WEB[React UI]
+  S --> CLI[Typer CLI]
+  S --> MCP[FastMCP server] --> AG[IBM Bob and<br/>other agents]
+  S --> ACT[PR guard Action]
 ```
-heirloom/
-├── api/            FastAPI REST API (thin routes, all logic in core/)
-├── cli/            Typer CLI
-├── mcp_server/     FastMCP server (stdio + HTTP)
-├── web/            React + TypeScript web UI
-├── core/
-│   ├── ingest/     Ingestion pipeline (walk, git log, blame, comments, docs, PRs)
-│   ├── analysis/   Coupling, imports, ownership, impact, entry-points
-│   ├── decisions/  Extraction, deduplication, .heirloom record format
-│   ├── search/     BM25 index over decisions
-│   ├── services/   Why Card, Ask, Capture, Queries, Trails
-│   ├── export/     Markdown + JSON exporters
-│   ├── llm/        Provider abstraction, prompt loader, LLM cache
-│   ├── models/     SQLAlchemy ORM + Pydantic schemas
-│   ├── trails/     Onboarding trail builder
-│   ├── config.py   Environment-based settings
-│   ├── db.py       Session factory, per-repo SQLite
-│   └── errors.py   Typed exception hierarchy
-├── migrations/     Alembic migrations
-└── tests/          pytest test suite (≥80% coverage)
-```
 
-### Data storage
+The API, CLI and MCP server are thin layers over `core/`; no logic is duplicated. Scoring formulas and the data model: [docs/architecture.md](docs/architecture.md). REST endpoints: [docs/api.md](docs/api.md), with the OpenAPI spec served at `/api/openapi.json` and interactive docs at `/api/docs`.
 
-One SQLite database per repo at `~/.heirloom/db/<repo_id>.sqlite`. Remote repos are shallow-cloned to `~/.heirloom/cache/`. Schema is managed by Alembic.
+## Tech stack
 
-### Ingestion pipeline stages
-
-1. **Resolve / clone** — local path or GitHub URL → working directory
-2. **Walk file tree** — language detection, LOC count
-3. **Commit history** — git log; author identity merging
-4. **Git blame** — per-file line attribution (incremental: only changed files)
-5. **Comments & docs** — intent comments (`FIXME`, `DO NOT`, `HACK`, …) + ADR files
-6. **GitHub PRs** — merged PR bodies as evidence (needs `GITHUB_TOKEN`)
-7. **Structure analysis** — imports, co-change coupling, ownership %, bus factor, at-risk flag
-8. **Decision extraction** — keyword filter → heuristic or LLM extraction → deduplication → persist
-
----
+- **Backend:** Python 3.11+, FastAPI, SQLAlchemy 2, Alembic, Pydantic v2, GitPython and direct git calls, rapidfuzz, rank_bm25, Typer, rich, httpx, FastMCP, structlog
+- **LLM:** IBM watsonx.ai (Granite) behind an `LLMProvider` interface, with an OpenAI-compatible provider and a no-key fallback
+- **Frontend:** React 18, TypeScript (strict), Vite, Tailwind CSS, D3 v7, React Router, TanStack Query
+- **Quality:** pytest (155 tests, 87% coverage on `core/`), Vitest and Testing Library (9 tests), ruff, mypy strict on `core/`, ESLint
 
 ## Development
 
 ```bash
-# Install everything (backend + frontend)
-make install
-
-# Run backend + frontend in development mode
-make dev          # API on :8000, Vite dev server on :5173
-
-# Tests
-make test         # pytest + pnpm test
-
-# Lint
-make lint         # ruff + pnpm lint
-
-# Demo mode (read-only, no ingest)
-make demo
+pytest -q                                  # Python tests (no network, no keys)
+cd web && pnpm test && pnpm lint && pnpm build
+ruff check core api cli mcp_server tests && ruff format --check core api cli mcp_server tests
+mypy core
 ```
 
-### Running tests only
-
-```bash
-pytest -q
-pytest -q --cov=core --cov-report=term-missing
-```
-
-### CI
-
-GitHub Actions runs two parallel jobs on every push and pull request:
-
-- **python** — ruff lint + format check, pytest with ≥80% coverage enforced
-- **web** — pnpm lint, pnpm test, pnpm build
-
----
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md).
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).

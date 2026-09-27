@@ -1,28 +1,317 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ------------------------------------------------------------------ */
+/* Neo-brutalist theme tokens (matches the CampusEvac reference site).  */
+/* ------------------------------------------------------------------ */
+:root {
+  --ink: #1d1626;
+  --ink-soft: #5c5066;
+  --paper: #f8f2ea;
+  --paper-light: #fffaf3;
+  --night: #16111e;
+  --sun: #ffc44d;
+  --sun-hover: #ffd070;
+  --coral: #ff6a3d;
+  --mint: #2fd18f;
+  --violet: #7b5cff;
+  --danger: #ef3b4b;
+  --grid-line: rgba(29, 22, 38, 0.06);
+}
+/* Dark mode swaps ink and paper; accents stay. */
+.dark {
+  --ink: #f8f2ea;
+  --ink-soft: #b9b0c4;
+  --paper: #16111e;
+  --paper-light: #1d1626;
+  --night: #0d0a12;
+  --grid-line: rgba(248, 242, 234, 0.06);
+}
+
 @layer base {
   html {
     @apply antialiased;
+    font-feature-settings: 'cv11', 'ss01';
   }
   body {
-    @apply bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100;
+    color: var(--ink);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background-color: var(--paper);
+    background-image:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 24px 24px;
   }
   /* Visible focus rings everywhere (keyboard navigation requirement). */
   :focus-visible {
-    @apply outline-none ring-2 ring-blue-500 ring-offset-2 ring-offset-white dark:ring-offset-gray-950;
+    outline: 3px solid var(--violet);
+    outline-offset: 2px;
+  }
+  h1,
+  h2,
+  h3 {
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: -0.02em;
   }
 }
 
+/* Existing pages use Tailwind gray utilities; remap them onto the palette
+   so no page has to change. Kept outside @layer so they win over utilities. */
+.text-gray-900,
+.text-gray-800,
+.text-gray-700 {
+  color: var(--ink) !important;
+}
+.text-gray-600,
+.text-gray-500,
+.text-gray-400 {
+  color: var(--ink-soft) !important;
+}
+.dark .dark\:text-gray-100,
+.dark .dark\:text-gray-200,
+.dark .dark\:text-gray-300 {
+  color: var(--ink) !important;
+}
+.bg-white,
+.dark .dark\:bg-gray-900,
+.dark .dark\:bg-gray-950 {
+  background-color: var(--paper-light) !important;
+}
+.bg-gray-50,
+.bg-gray-100,
+.dark .dark\:bg-gray-800 {
+  background-color: color-mix(in srgb, var(--ink) 8%, var(--paper-light)) !important;
+}
+.bg-gray-200,
+.dark .dark\:bg-gray-700 {
+  background-color: color-mix(in srgb, var(--ink) 16%, var(--paper-light)) !important;
+}
+.border-gray-100,
+.border-gray-200,
+.border-gray-300,
+.dark .dark\:border-gray-700,
+.dark .dark\:border-gray-800 {
+  border-color: var(--ink) !important;
+}
+.rounded,
+.rounded-sm,
+.rounded-md,
+.rounded-lg,
+.rounded-xl,
+.rounded-2xl {
+  border-radius: 0 !important;
+}
+.shadow-sm,
+.shadow,
+.shadow-md,
+.shadow-lg {
+  box-shadow: 4px 4px 0 var(--ink) !important;
+}
+
 @layer components {
+  /* Shared primitives. Every page already uses these class names. */
   .card {
-    @apply rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900;
+    border: 3px solid var(--ink);
+    background: var(--paper-light);
+    box-shadow: 8px 8px 0 var(--ink);
+    padding: 1.25rem;
   }
   .btn {
-    @apply inline-flex items-center gap-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium hover:bg-gray-100 dark:border-gray-700 dark:hover:bg-gray-800;
+    border: 3px solid var(--ink);
+    background: var(--paper-light);
+    color: var(--ink);
+    box-shadow: 3px 3px 0 var(--ink);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    font-size: 11px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    transition:
+      transform 0.14s,
+      box-shadow 0.14s,
+      background 0.14s,
+      color 0.14s;
   }
-  .input {
-    @apply rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900;
+  .btn:hover {
+    background: var(--ink);
+    color: var(--paper);
+  }
+  .btn:active {
+    transform: translate(3px, 3px);
+    box-shadow: 1px 1px 0 var(--ink);
+  }
+  .btn:disabled {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+  .btn-primary,
+  .brutal-button {
+    border: 3px solid var(--ink);
+    background: var(--sun);
+    color: #1d1626;
+    box-shadow: 4px 4px 0 var(--ink);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    font-size: 11px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    transition:
+      transform 0.14s,
+      box-shadow 0.14s,
+      background 0.14s;
+  }
+  .btn-primary:hover,
+  .brutal-button:hover {
+    background: var(--sun-hover);
+    box-shadow: 6px 6px 0 var(--ink);
+    transform: translate(-1px, -1px);
+  }
+  .btn-primary:active,
+  .brutal-button:active {
+    box-shadow: 1px 1px 0 var(--ink);
+    transform: translate(3px, 3px);
+  }
+  .btn-primary:disabled,
+  .brutal-button:disabled {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+  .input,
+  .brutal-input {
+    border: 3px solid var(--ink);
+    background: var(--paper-light);
+    color: var(--ink);
+    box-shadow: 3px 3px 0 var(--ink);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+  .input::placeholder,
+  .brutal-input::placeholder {
+    color: var(--ink-soft);
+  }
+  .input:focus,
+  .brutal-input:focus {
+    outline: 3px solid var(--violet);
+    outline-offset: 2px;
+  }
+  .skeleton {
+    @apply animate-pulse;
+    background: color-mix(in srgb, var(--ink) 12%, var(--paper-light));
+  }
+
+  /* Reference-site components. */
+  .brutal-card {
+    border: 3px solid var(--ink);
+    background: var(--paper-light);
+    box-shadow: 8px 8px 0 var(--ink);
+  }
+  .brutal-slab {
+    border: 3px solid var(--ink);
+    box-shadow: 10px 10px 0 var(--ink);
+  }
+  .brutal-screen {
+    border: 3px solid var(--ink);
+    background: var(--night);
+    color: #f8f2ea;
+    box-shadow: 12px 12px 0 var(--coral);
+  }
+  .brutal-sticker {
+    border: 3px solid var(--ink);
+    box-shadow: 4px 4px 0 var(--ink);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.3rem 0.7rem;
+    font-size: 0.6rem;
+    font-weight: 900;
+    display: inline-flex;
+  }
+  .brutal-tag {
+    border: 2px solid var(--ink);
+    box-shadow: 3px 3px 0 var(--ink);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 0.2rem 0.55rem;
+    font-size: 0.62rem;
+    font-weight: 900;
+    display: inline-block;
+  }
+  .brutal-rule {
+    border-bottom: 3px solid var(--ink);
+  }
+  .brutal-num {
+    font-variant-numeric: tabular-nums;
+    -webkit-text-stroke: 2px var(--ink);
+    color: transparent;
+  }
+  .brutal-ticker {
+    border-top: 3px solid var(--ink);
+    border-bottom: 3px solid var(--ink);
+    background: var(--ink);
+    color: var(--paper);
+    overflow: hidden;
+  }
+  .brutal-ticker__track {
+    width: max-content;
+    display: flex;
+    animation: brutal-ticker 34s linear infinite;
+  }
+  .signal-pulse {
+    animation: signal-pulse 1.8s ease-in-out infinite;
+  }
+  .reveal {
+    animation: reveal 0.62s cubic-bezier(0.22, 0.8, 0.24, 1) both;
+    animation-delay: var(--reveal-delay, 0s);
+  }
+}
+
+@keyframes brutal-ticker {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+@keyframes signal-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
+@keyframes reveal {
+  0% {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .brutal-ticker__track,
+  .signal-pulse,
+  .reveal {
+    animation: none;
   }
 }

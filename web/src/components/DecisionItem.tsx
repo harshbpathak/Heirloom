@@ -1,9 +1,9 @@
 import type { CompactDecision } from '../api';
 
 const CONFIDENCE_STYLES: Record<string, string> = {
-  high: 'bg-green-100 text-green-900 dark:bg-green-950 dark:text-green-200',
-  medium: 'bg-blue-100 text-blue-900 dark:bg-blue-950 dark:text-blue-200',
-  low: 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200',
+  high: 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-300',
+  medium: 'bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-400',
+  low: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
 };
 
 /** One decision with its confidence badge and clickable evidence links. */
@@ -28,7 +28,7 @@ export function DecisionItem({ decision }: { decision: CompactDecision }) {
               {i > 0 && ', '}
               {e.url ? (
                 <a
-                  className="underline hover:text-blue-600"
+                  className="underline hover:text-brand-600"
                   href={e.url}
                   target="_blank"
                   rel="noreferrer"

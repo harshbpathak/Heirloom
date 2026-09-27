@@ -17,6 +17,7 @@ from core.config import get_settings
 from core.db import list_repo_ids, session_for
 from core.errors import HeirloomError, RepoNotFoundError, ValidationFailedError
 from core.llm.provider import get_provider
+from core.logging_config import configure_logging
 from core.models.db_models import Decision, DecisionFile, File, Repo
 from core.services.ask import ask as ask_service
 from core.services.capture_service import local_repo_path, record_decision
@@ -32,6 +33,8 @@ from core.services.queries import (
 )
 from core.services.whycard import agent_context, build_why_card, why_card_markdown
 from core.trails.builder import build_trail
+
+configure_logging()
 
 app = FastAPI(
     title="Heirloom API", version="0.1.0", docs_url="/api/docs", openapi_url="/api/openapi.json"

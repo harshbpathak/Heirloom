@@ -14,6 +14,9 @@ from core.config import get_settings
 from core.db import list_repo_ids, repo_id_from_source, session_for
 from core.errors import HeirloomError
 from core.llm.provider import get_provider
+from core.logging_config import configure_logging
+
+configure_logging()
 
 app = typer.Typer(
     name="heirloom",

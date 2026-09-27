@@ -54,6 +54,8 @@ def ask(
                 file_row = session.scalar(
                     select(File).where(File.repo_id == repo_id, File.path == path)
                 )
+                if file_row is None:
+                    raise FileNotFoundInRepoError(path)
                 holders = holders_for_file(session, file_row)
                 if holders:
                     parts = [
@@ -93,7 +95,7 @@ def ask(
         extra = f" The closest file is '{suggestion}' — open its Why Card." if suggestion else ""
         return AskAnswer(answer=f"{NO_ANSWER}.{extra}", route="none")
 
-    decisions = [session.get(Decision, h.decision_id) for h in hits]
+    decisions = [d for h in hits if (d := session.get(Decision, h.decision_id)) is not None]
 
     if provider.available:
         payload = json.dumps(
