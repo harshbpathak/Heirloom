@@ -39,7 +39,9 @@ class Settings:
     """Runtime settings for Heirloom, sourced from the environment."""
 
     heirloom_home: Path = field(
-        default_factory=lambda: Path(_env("HEIRLOOM_HOME", str(Path.home() / ".heirloom"))).expanduser()
+        default_factory=lambda: Path(
+            _env("HEIRLOOM_HOME", str(Path.home() / ".heirloom"))
+        ).expanduser()
     )
     demo_mode: bool = field(default_factory=lambda: _env_bool("HEIRLOOM_DEMO"))
     log_json: bool = field(default_factory=lambda: _env_bool("HEIRLOOM_LOG_JSON"))
