@@ -11,13 +11,13 @@ import hashlib
 import json
 import re
 from abc import ABC, abstractmethod
-from datetime import datetime
 from typing import Any
 
 import httpx
 
 from core.config import Settings, get_settings
 from core.errors import LLMError
+from core.timeutil import utcnow
 
 
 class LLMProvider(ABC):
@@ -74,7 +74,9 @@ class WatsonxProvider(LLMProvider):
         if self._model is None:
             try:
                 from ibm_watsonx_ai import Credentials  # type: ignore[import-not-found]
-                from ibm_watsonx_ai.foundation_models import ModelInference  # type: ignore[import-not-found]
+                from ibm_watsonx_ai.foundation_models import (
+                    ModelInference,  # type: ignore[import-not-found]
+                )
             except ImportError as exc:
                 raise LLMError(
                     "ibm-watsonx-ai is not installed; install with `pip install heirloom[watsonx]`"
@@ -185,5 +187,5 @@ def cached_complete_json(
         assert isinstance(result, dict)
         return result
     result = provider.complete_json(prompt + "\n\n" + payload)
-    session.add(LLMCache(key=key, response=json.dumps(result), created_at=datetime.utcnow()))
+    session.add(LLMCache(key=key, response=json.dumps(result), created_at=utcnow()))
     return result
