@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+
+from core.timeutil import utcnow
 
 RECENT_WINDOW_DAYS = 365
 INACTIVE_DAYS = 180
@@ -79,6 +82,12 @@ def merge_identities(
         if p[1]:
             identity.emails.add(p[1])
         result[p] = identity
+
+    # Canonical name = the alias used most often (ties: longest, then alphabetical),
+    # so a one-off "Alice C" never displaces "Alice Chen".
+    name_counts = Counter(name for name, _ in raw_identities)
+    for identity in groups.values():
+        identity.canonical_name = max(identity.names, key=lambda n: (name_counts[n], len(n), n))
 
     # Apply user overrides from authors.yml (email or name -> canonical name).
     for identity in groups.values():
@@ -156,20 +165,28 @@ def bus_factor(shares: list[OwnershipShare]) -> int:
     return len(shares)
 
 
-def is_at_risk(shares: list[OwnershipShare], factor: int, now: datetime | None = None) -> bool:
-    """At risk = bus factor 1 and top owner inactive for 180+ days (spec F4.5)."""
+def is_at_risk(
+    shares: list[OwnershipShare],
+    factor: int,
+    now: datetime | None = None,
+    person_last_active: dict[str, datetime] | None = None,
+) -> bool:
+    """At risk = bus factor 1 and the top owner made no commit in 180 days (spec F4.5).
+
+    Activity is per person, repo-wide: pass ``person_last_active`` (author ->
+    latest commit anywhere in the repo). Without it, the share's own
+    ``last_commit_at`` is used as a fallback.
+    """
     if factor != 1 or not shares:
         return False
     top = shares[0]
-    if top.last_commit_at is None:
-        return True  # unknown activity for the single owner counts as risk
-    now = now or datetime.utcnow()
-    return (now - top.last_commit_at) > timedelta(days=INACTIVE_DAYS)
+    last = (person_last_active or {}).get(top.author, top.last_commit_at)
+    return is_inactive(last, now)
 
 
 def is_inactive(last_commit_at: datetime | None, now: datetime | None = None) -> bool:
     """Whether an author counts as inactive (no commit in 180 days)."""
     if last_commit_at is None:
         return True
-    now = now or datetime.utcnow()
+    now = now or utcnow()
     return (now - last_commit_at) > timedelta(days=INACTIVE_DAYS)
