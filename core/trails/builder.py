@@ -15,7 +15,7 @@ from core.errors import LLMError
 from core.llm.prompts_loader import load_prompt
 from core.llm.provider import LLMProvider, cached_complete_json
 from core.models.db_models import Decision, DecisionFile, File, Import
-from core.models.schemas import Trail, TrailStep
+from core.models.schemas import CompactDecision, Trail, TrailStep
 from core.search.index import tokenize
 from core.services.queries import compact_decision
 
@@ -146,14 +146,16 @@ def _topological_order(
     return ordered
 
 
-def _top_decisions(session: Session, repo_id: str, file_id: int):
+def _top_decisions(session: Session, repo_id: str, file_id: int) -> list[CompactDecision]:
     """The 1-2 most important (newest, highest-confidence) decisions of a file."""
-    rows = session.scalars(
-        select(Decision)
-        .join(DecisionFile, DecisionFile.decision_id == Decision.id)
-        .where(DecisionFile.file_id == file_id)
-        .order_by(Decision.created_at.desc())
-    ).all()
+    rows = list(
+        session.scalars(
+            select(Decision)
+            .join(DecisionFile, DecisionFile.decision_id == Decision.id)
+            .where(DecisionFile.file_id == file_id)
+            .order_by(Decision.created_at.desc())
+        ).all()
+    )
     rows.sort(key=lambda d: {"high": 0, "medium": 1, "low": 2}.get(d.confidence, 3))
     return [compact_decision(session, d) for d in rows[:2]]
 
