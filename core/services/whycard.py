@@ -12,7 +12,8 @@ from core.errors import LLMError
 from core.ingest.comments import extract_intent_comments
 from core.llm.prompts_loader import load_prompt
 from core.llm.provider import LLMProvider, cached_complete_json
-from core.models.schemas import ActivityPoint, AgentContext, WarningItem, WhyCard
+from core.models.db_models import File
+from core.models.schemas import ActivityPoint, AgentContext, CompactDecision, WarningItem, WhyCard
 from core.services.queries import (
     activity_for_file,
     decisions_for_file,
@@ -71,7 +72,13 @@ def _warnings(repo_path: Path, path: str, language: str | None) -> list[WarningI
     ]
 
 
-def _summary(session, file_row, repo_path, provider, decisions) -> tuple[str, str]:
+def _summary(
+    session: Session,
+    file_row: File,
+    repo_path: Path | None,
+    provider: LLMProvider | None,
+    decisions: list[CompactDecision],
+) -> tuple[str, str]:
     """File summary: cached, LLM if available, else header comment, else honest 'none'."""
     if file_row.summary and file_row.summary_source != "none":
         return file_row.summary, file_row.summary_source
