@@ -11,7 +11,9 @@ services:
       - key: CORS_ORIGINS
         value: "*"
       - key: HEIRLOOM_HOME
-        value: /app/.heirloom
+        value: /app/demo
+      - key: HEIRLOOM_DEMO
+        value: "1"
       - key: HEIRLOOM_MAX_COMMITS
         value: "500"
       - key: PORT
