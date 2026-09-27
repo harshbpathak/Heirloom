@@ -1,0 +1,17 @@
+services:
+  api:
+    build: .
+    command: python -m uvicorn api.main:app --host 0.0.0.0 --port 8000
+    environment:
+      - HEIRLOOM_DEMO=${HEIRLOOM_DEMO:-0}
+      - HEIRLOOM_HOME=/data
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - WATSONX_API_KEY=${WATSONX_API_KEY:-}
+      - WATSONX_PROJECT_ID=${WATSONX_PROJECT_ID:-}
+    volumes:
+      - heirloom-data:/data
+    ports:
+      - "8000:8000"
+
+volumes:
+  heirloom-data:
