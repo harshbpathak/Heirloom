@@ -34,10 +34,38 @@ LOCKFILES = {
 }
 
 BINARY_EXTENSIONS = {
-    ".png", ".jpg", ".jpeg", ".gif", ".ico", ".webp", ".svg", ".pdf", ".zip",
-    ".gz", ".tar", ".whl", ".exe", ".dll", ".so", ".dylib", ".woff", ".woff2",
-    ".ttf", ".eot", ".mp3", ".mp4", ".mov", ".sqlite", ".db", ".pyc", ".class",
-    ".jar", ".bin", ".wasm", ".min.js", ".min.css",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".ico",
+    ".webp",
+    ".svg",
+    ".pdf",
+    ".zip",
+    ".gz",
+    ".tar",
+    ".whl",
+    ".exe",
+    ".dll",
+    ".so",
+    ".dylib",
+    ".woff",
+    ".woff2",
+    ".ttf",
+    ".eot",
+    ".mp3",
+    ".mp4",
+    ".mov",
+    ".sqlite",
+    ".db",
+    ".pyc",
+    ".class",
+    ".jar",
+    ".bin",
+    ".wasm",
+    ".min.js",
+    ".min.css",
 }
 
 MAX_FILE_BYTES = 1_000_000
@@ -140,11 +168,7 @@ def walk_repo(repo_path: Path) -> list[WalkedFile]:
     if tracked is not None:
         candidates = [Path(p) for p in tracked]
     else:
-        candidates = [
-            p.relative_to(repo_path)
-            for p in repo_path.rglob("*")
-            if p.is_file()
-        ]
+        candidates = [p.relative_to(repo_path) for p in repo_path.rglob("*") if p.is_file()]
 
     results: list[WalkedFile] = []
     for rel in candidates:
@@ -158,5 +182,7 @@ def walk_repo(repo_path: Path) -> list[WalkedFile]:
         if should_skip(rel, size):
             continue
         posix = rel.as_posix()
-        results.append(WalkedFile(path=posix, language=detect_language(posix), loc=count_loc(abs_path)))
+        results.append(
+            WalkedFile(path=posix, language=detect_language(posix), loc=count_loc(abs_path))
+        )
     return results
