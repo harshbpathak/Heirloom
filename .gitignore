@@ -88,3 +88,4 @@ web/*.tsbuildinfo
 
 # Local agent config
 .claude/
+web/screenshots/
