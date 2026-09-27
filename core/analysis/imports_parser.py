@@ -13,7 +13,10 @@ from pathlib import PurePosixPath
 JS_IMPORT_RE = re.compile(
     r"""(?:import\s+(?:[\w*{},\s$]+\s+from\s+)?|export\s+(?:[\w*{},\s$]+\s+from\s+)|require\(\s*|import\(\s*)['"]([^'"]+)['"]""",
 )
-PY_IMPORT_RE = re.compile(r"^\s*(?:from\s+([\w.]+)\s+import\s+|import\s+([\w.]+(?:\s*,\s*[\w.]+)*))", re.MULTILINE)
+PY_IMPORT_RE = re.compile(
+    r"^\s*(?:from\s+([\w.]+)\s+import\s+([\w.*]+(?:\s+as\s+\w+)?(?:\s*,\s*[\w.*]+(?:\s+as\s+\w+)?)*)|import\s+([\w.]+(?:\s*,\s*[\w.]+)*))",
+    re.MULTILINE,
+)
 
 JS_EXTENSIONS = (".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".vue")
 JS_INDEX_CANDIDATES = tuple(f"/index{ext}" for ext in JS_EXTENSIONS)
@@ -25,9 +28,15 @@ def extract_import_specs(text: str, language: str) -> list[str]:
         specs: list[str] = []
         for match in PY_IMPORT_RE.finditer(text):
             if match.group(1):
-                specs.append(match.group(1))
-            elif match.group(2):
-                specs.extend(m.strip() for m in match.group(2).split(","))
+                base = match.group(1)
+                specs.append(base)
+                # "from pkg import mod" may target a submodule: emit pkg.mod too.
+                for name in (match.group(2) or "").split(","):
+                    name = name.strip().split(" as ")[0].strip()
+                    if name and name != "*":
+                        specs.append(f"{base}.{name}" if not base.endswith(".") else base + name)
+            elif match.group(3):
+                specs.extend(m.strip() for m in match.group(3).split(","))
         return specs
     if language in ("javascript", "typescript", "vue"):
         source = text
