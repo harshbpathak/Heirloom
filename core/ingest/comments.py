@@ -19,6 +19,8 @@ INTENT_PATTERN = re.compile(
 # "note" in prose while still catching NOTE: tags).
 UPPER_ONLY = {"NOTE", "WHY", "XXX", "IMPORTANT"}
 
+# DO NOT add new markers here without updating the spec (F1 §5) and tests.
+# Each entry must correspond to a WARNING_MARKERS entry in core/models/schemas.py.
 WARNING_MARKERS = ("DO NOT", "HACK", "FIXME", "XXX", "WARNING")
 
 COMMENT_PREFIXES = {
