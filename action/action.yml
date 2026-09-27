@@ -1,0 +1,38 @@
+name: Heirloom PR guard
+description: >-
+  Comments on pull requests with the recorded decisions, bus factor and
+  impacted files for every changed file. Works offline and on forks.
+branding:
+  icon: book-open
+  color: orange
+
+inputs:
+  fail_on_at_risk:
+    description: >-
+      Strict mode. Fail when the PR changes an at-risk file and none of its
+      knowledge holders is a requested reviewer.
+    default: "false"
+  max_commits:
+    description: How many commits of history to analyze.
+    default: "2000"
+  github_token:
+    description: Token used to post the comment. The default Actions token is enough.
+    default: ${{ github.token }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+    - name: Install Heirloom
+      shell: bash
+      run: pip install --quiet "${{ github.action_path }}/.."
+    - name: Run PR guard
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+        INPUT_FAIL_ON_AT_RISK: ${{ inputs.fail_on_at_risk }}
+        INPUT_MAX_COMMITS: ${{ inputs.max_commits }}
+        HEIRLOOM_HOME: ${{ runner.temp }}/heirloom
+      run: python "${{ github.action_path }}/entrypoint.py"
