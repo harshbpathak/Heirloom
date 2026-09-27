@@ -17,12 +17,14 @@ from pathlib import Path
 import structlog
 import yaml
 from sqlalchemy import delete, func, select
+from sqlalchemy.orm import Session
 
 from core.analysis.coupling import compute_coupling
 from core.analysis.entry_points import detect_entry_points
 from core.analysis.imports_parser import resolve_imports
 from core.analysis.ownership import (
     RECENT_WINDOW_DAYS,
+    AuthorIdentity,
     bus_factor,
     compute_ownership,
     is_inactive,
@@ -32,14 +34,14 @@ from core.config import Settings, get_settings
 from core.db import repo_id_from_source, session_for
 from core.decisions.capture import load_decision_records
 from core.decisions.dedupe import merge_decisions
-from core.decisions.extraction import EvidenceCandidate, extract_decisions
+from core.decisions.extraction import DraftDecision, EvidenceCandidate, extract_decisions
 from core.errors import IngestError
 from core.ingest.blame import blame_shares
 from core.ingest.comments import extract_intent_comments
 from core.ingest.docs import load_docs
 from core.ingest.github_prs import fetch_merged_prs, parse_github_source
 from core.ingest.gitlog import default_branch, head_commit, read_git_log
-from core.ingest.walker import ANALYZED_LANGUAGES, walk_repo
+from core.ingest.walker import ANALYZED_LANGUAGES, WalkedFile, walk_repo
 from core.llm.provider import get_provider
 from core.models.db_models import (
     Author,
@@ -319,7 +321,7 @@ def _commit_url(source: str, commit_hash: str) -> str | None:
     return None
 
 
-def _existing_identities(session, repo_id: str) -> list[tuple[str, str]]:
+def _existing_identities(session: Session, repo_id: str) -> list[tuple[str, str]]:
     """Raw (name, email) pairs already stored for this repo."""
     pairs: list[tuple[str, str]] = []
     for author in session.scalars(select(Author).where(Author.repo_id == repo_id)):
@@ -345,7 +347,9 @@ def _load_alias_overrides(repo_path: Path) -> dict[str, str]:
     return {str(k).lower(): str(v) for k, v in data.items()}
 
 
-def _persist_authors(session, repo_id: str, identities) -> dict[str, int]:
+def _persist_authors(
+    session: Session, repo_id: str, identities: dict[tuple[str, str], AuthorIdentity]
+) -> dict[str, int]:
     """Upsert canonical authors; returns canonical_name -> author id."""
     existing = {
         a.canonical_name: a
@@ -367,7 +371,10 @@ def _persist_authors(session, repo_id: str, identities) -> dict[str, int]:
 
 
 def _persist_evidence(
-    session, repo_id: str, candidates: list[EvidenceCandidate], author_ids
+    session: Session,
+    repo_id: str,
+    candidates: list[EvidenceCandidate],
+    author_ids: dict[str, int],
 ) -> dict[str, int]:
     """Upsert evidence rows; returns 'type:ref' -> evidence id."""
     existing = {
@@ -393,7 +400,11 @@ def _persist_evidence(
 
 
 def _analyze_structure(
-    session, repo_id: str, repo_path: Path, walked, file_ids: dict[str, int]
+    session: Session,
+    repo_id: str,
+    repo_path: Path,
+    walked: list[WalkedFile],
+    file_ids: dict[str, int],
 ) -> None:
     """Imports, fan-in/out, entry points (F3 steps 1, 2, 5)."""
     repo_file_set = {w.path for w in walked}
@@ -425,7 +436,7 @@ def _analyze_structure(
         row.is_entry_point = row.path in entry_points
 
 
-def _analyze_coupling(session, repo_id: str, file_ids: dict[str, int]) -> None:
+def _analyze_coupling(session: Session, repo_id: str, file_ids: dict[str, int]) -> None:
     """Co-change coupling over the full stored commit history (F3 step 3)."""
     id_to_path = {v: k for k, v in file_ids.items()}
     commit_file_rows = session.execute(
@@ -450,13 +461,13 @@ def _analyze_coupling(session, repo_id: str, file_ids: dict[str, int]) -> None:
 
 
 def _analyze_ownership(
-    session,
+    session: Session,
     repo_id: str,
     repo_path: Path,
-    walked,
+    walked: list[WalkedFile],
     file_ids: dict[str, int],
     blame_data: dict[str, dict[tuple[str, str], int]],
-    identities,
+    identities: dict[tuple[str, str], AuthorIdentity],
     author_ids_by_name: dict[str, int],
 ) -> None:
     """Ownership, bus factor and at-risk flags per file (F4)."""
@@ -471,10 +482,12 @@ def _analyze_ownership(
         .join(Commit, Commit.hash == CommitFile.commit_hash)
         .where(Commit.repo_id == repo_id)
     ).all()
-    author_names = {v: k for k, v in author_ids_by_name.items()}
+    author_names: dict[int, str] = {v: k for k, v in author_ids_by_name.items()}
     recent: dict[int, dict[str, int]] = {}
     last_commit: dict[int, dict[str, datetime]] = {}
     for fid, author_id, date, added, deleted in rows:
+        if author_id is None:
+            continue
         name = author_names.get(author_id)
         if name is None:
             continue
@@ -485,9 +498,10 @@ def _analyze_ownership(
             recent.setdefault(fid, {})[name] = recent.get(fid, {}).get(name, 0) + added + deleted
 
     for path, shares_raw in blame_data.items():
-        fid = file_ids.get(path)
-        if fid is None:
+        file_id = file_ids.get(path)
+        if file_id is None:
             continue
+        fid = file_id
         blame_by_author: dict[str, int] = {}
         for (name, email), lines in shares_raw.items():
             identity = identities.get((name, email))
@@ -515,13 +529,14 @@ def _analyze_ownership(
                 )
             )
         file_row = session.get(File, fid)
-        file_row.bus_factor = bus_factor(shares)
+        if file_row is not None:
+            file_row.bus_factor = bus_factor(shares)
 
     session.flush()
     _refresh_risk_flags(session, repo_id, now)
 
 
-def person_last_active(session, repo_id: str) -> dict[int, datetime]:
+def person_last_active(session: Session, repo_id: str) -> dict[int, datetime]:
     """Latest commit date per author id, anywhere in the repo."""
     rows = session.execute(
         select(Commit.author_id, func.max(Commit.date))
@@ -531,7 +546,7 @@ def person_last_active(session, repo_id: str) -> dict[int, datetime]:
     return {author_id: last for author_id, last in rows if author_id is not None}
 
 
-def _refresh_risk_flags(session, repo_id: str, now: datetime) -> None:
+def _refresh_risk_flags(session: Session, repo_id: str, now: datetime) -> None:
     """Recompute at_risk for every file from stored ownership and repo-wide activity.
 
     Runs over all files (not just re-blamed ones) because an owner can go
@@ -555,7 +570,11 @@ def _refresh_risk_flags(session, repo_id: str, now: datetime) -> None:
 
 
 def _persist_decisions(
-    session, repo_id: str, drafts, evidence_ids: dict[str, int], file_ids: dict[str, int]
+    session: Session,
+    repo_id: str,
+    drafts: list[DraftDecision],
+    evidence_ids: dict[str, int],
+    file_ids: dict[str, int],
 ) -> None:
     """Insert extracted decisions, skipping ones whose evidence is already linked."""
     linked_evidence = set(session.scalars(select(DecisionEvidence.evidence_id)))
@@ -584,7 +603,7 @@ def _persist_decisions(
                 session.merge(DecisionFile(decision_id=decision.id, file_id=fid))
 
 
-def _compute_stats(session, repo_id: str) -> dict:
+def _compute_stats(session: Session, repo_id: str) -> dict[str, object]:
     """Repo-level stats for the overview strip."""
     files = list(session.scalars(select(File).where(File.repo_id == repo_id)))
     total_loc = sum(f.loc for f in files)
