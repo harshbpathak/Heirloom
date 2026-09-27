@@ -32,9 +32,9 @@ Heirloom mines git history, blame, code comments, pull requests and docs into a 
 - **Two skills:** `capture-why` records the design choice in a staged diff and stamps it with the SHA-256 of its own `SKILL.md`, and `onboard-me` walks a newcomer through a trail. Current hashes:
   - `capture-why`: `69c697de0420712a127ea50a0295cd84069fb230eb34c509233b808089998bb6`
   - `onboard-me`: `3f9fddbd87eea809fbdd4b2c3202a6e8a5eb9cff625523fb52df6bf5d8653a2e`
-- **Bob in the build:** Bob brought `core/` to zero mypy strict errors, set up the PR guard workflow and ran it on a test PR, and wrote the API, architecture, CLI and MCP reference docs. See [BOB.md](BOB.md) for how the work was split.
+- **Bob in the build:** Bob brought `core/` to zero mypy strict errors, set up the PR guard workflow and verified it on [PR #1](https://github.com/harshbpathak/Heirloom/pull/1), and wrote the API, architecture, CLI and MCP reference docs. See [BOB.md](BOB.md) for how the work was split.
 - **MCP Builder:** not used; the FastMCP server was written directly.
-- **Sessions:** exported to `bob_sessions/`. See [BOB.md](BOB.md) for the count.
+- **Sessions:** 4 Bob sessions, recorded in `bob_sessions/` (3 transcripts plus a task card for each). See [BOB.md](BOB.md).
 
 ## Tech stack
 

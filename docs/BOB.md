@@ -20,10 +20,13 @@ The core of Heirloom was built in Claude Code, not Bob. That covers the core lib
 
 Bob was then used as a working team member on Heirloom's own code:
 
-| Session | File | What Bob did | Tests added |
+| Session | Files | What Bob did | Tests added |
 |---|---|---|---|
-| 01 | `bob_sessions/01-mypy-strict.md` | Brought `core/` from 28 mypy strict errors to zero, in 7 commits, with no blanket `type: ignore` | 0 (all 155 existing tests kept passing) |
-| 02 | `bob_sessions/02-pr-guard.md` | Added the PR guard workflow and ran it on a smoke-test PR (branch `test/pr-guard-smoke`) | 0 |
-| 03 | `bob_sessions/03-docs.md` | Wrote `docs/api.md`, `docs/architecture.md`, `docs/cli.md` and `docs/mcp.md` | 0 |
+| 01 | `bob_sessions/01-mypy-strict.png` (task card; transcript not exported) | Brought `core/` from 28 mypy strict errors to zero in 7 commits, with no blanket `type: ignore` | 0 (all existing tests kept passing) |
+| 02 | `bob_sessions/02-pr-guard.md`, `.png` | Added `.github/workflows/heirloom-pr-guard.yml` and ran it on [PR #1](https://github.com/harshbpathak/Heirloom/pull/1): the Heirloom comment posted, and a second push updated it in place. Both Action runs succeeded. | 0 |
+| 03 | `bob_sessions/03-test-api-core.md`, `.png` | Ran and reviewed the FastAPI and core-engine test suites | 0 |
+| 04 | `bob_sessions/04-project-walkthrough.md`, `.png` | Walked through the whole workflow and project for the team | 0 |
 
-Session files are exported from Bob into `bob_sessions/`. Rows without a matching file mean that session hasn't been exported yet.
+The reference docs `docs/api.md`, `docs/architecture.md`, `docs/cli.md` and `docs/mcp.md` were also written with Bob; that session was not exported.
+
+Each `.png` is Bob's task card for the session, showing its task id.
