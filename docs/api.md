@@ -310,7 +310,7 @@ Onboarding reading trail through the repo.
 
 Answer a natural-language question about the repo. Citations reference decision IDs.
 
-Requires an LLM to be configured.
+Works without an LLM: it returns the top matching decisions as a ranked, cited list, labeled "LLM not configured". With an LLM configured (see [the README](../README.md#with-keys-optional)), it writes a short answer citing decision IDs.
 
 **Body**
 ```json

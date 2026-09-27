@@ -212,7 +212,7 @@ heirloom ask "Why did we switch to Stripe?"
 heirloom ask "What is the retry strategy for failed webhooks?"
 ```
 
-Requires an LLM to be configured — see [LLM Integration](../README.md#llm-integration). Without an LLM the answer will be empty.
+Works without an LLM: it returns the top matching decisions as a ranked, cited list, labeled "LLM not configured". With an LLM configured (see [the README](../README.md#with-keys-optional)), it writes a short answer citing decision IDs.
 
 ---
 
