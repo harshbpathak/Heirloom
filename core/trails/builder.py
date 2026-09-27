@@ -57,7 +57,7 @@ def build_trail(
     for path in ordered:
         row = files[path]
         decisions = _top_decisions(session, repo_id, row.id)
-        reason = _step_reason(session, row, provider, len(steps) + 1, len(ordered))
+        reason = _step_reason(session, row, provider, len(steps) + 1, len(ordered), repo_path)
         steps.append(
             TrailStep(
                 path=path,
@@ -161,7 +161,12 @@ def _top_decisions(session: Session, repo_id: str, file_id: int) -> list[Compact
 
 
 def _step_reason(
-    session: Session, row: File, provider: LLMProvider | None, position: int, total: int
+    session: Session,
+    row: File,
+    provider: LLMProvider | None,
+    position: int,
+    total: int,
+    repo_path: Path | None = None,
 ) -> str:
     """One sentence explaining why to read this file now (LLM or template)."""
     if provider is not None and provider.available:
@@ -181,14 +186,50 @@ def _step_reason(
                 return reason[:300]
         except LLMError:
             pass
-    symbol = _top_symbol(row)
+    symbol = _top_symbol(row, repo_path)
     base = f"Imported by {row.fan_in} file{'s' if row.fan_in != 1 else ''}"
     if row.is_entry_point:
         base = "An entry point of the repo; " + base.lower()
     return f"{base}; defines {symbol}." if symbol else f"{base}."
 
 
-def _top_symbol(row: File) -> str | None:
-    """Best-effort top-level symbol name from the stored summary or path."""
+# Patterns for top-level symbol declarations, ordered by precedence.
+_SYMBOL_PATTERNS = [
+    # Python class / function
+    re.compile(r"^(?:class|def)\s+([A-Za-z_][A-Za-z0-9_]*)"),
+    # JS/TS: export default function/class, export function/class, export const/let/var
+    re.compile(
+        r"^export\s+(?:default\s+)?(?:async\s+)?(?:function|class)\s+([A-Za-z_$][A-Za-z0-9_$]*)"
+    ),
+    re.compile(r"^export\s+(?:const|let|var)\s+([A-Za-z_$][A-Za-z0-9_$]*)"),
+    # plain function/class (not exported) — lower priority
+    re.compile(r"^(?:async\s+)?function\s+([A-Za-z_$][A-Za-z0-9_$]*)"),
+    re.compile(r"^class\s+([A-Za-z_$][A-Za-z0-9_$]*)"),
+]
+
+
+def _top_symbol(row: File, repo_path: Path | None = None) -> str | None:
+    """Best-effort top-level symbol name parsed from the file.
+
+    Reads the first 200 lines of the source when available; otherwise falls
+    back to the path stem so the reason string always has something useful.
+    """
+    # Try to read the actual file content for reliable symbol extraction.
+    text = ""
+    if repo_path is not None:
+        try:
+            text = (repo_path / row.path).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            pass
+
+    # Scan the first 200 lines for a top-level declaration.
+    for line in (text.splitlines() if text else [])[:200]:
+        stripped = line.strip()
+        for pattern in _SYMBOL_PATTERNS:
+            m = pattern.match(stripped)
+            if m:
+                return m.group(1)
+
+    # Fall back to the file's stem (never invent data, but this is just a hint).
     stem = re.sub(r"\.[^.]+$", "", row.path.split("/")[-1])
-    return stem if stem and stem not in ("index", "__init__") else None
+    return stem if stem and stem not in ("index", "__init__", "mod", "lib") else None

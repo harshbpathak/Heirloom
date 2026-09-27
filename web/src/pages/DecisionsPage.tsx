@@ -43,6 +43,20 @@ export function DecisionsPage() {
         </form>
       </div>
 
+      {decisions.isLoading && (
+        <div className="card space-y-2 p-3" aria-busy="true">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="skeleton h-8 w-full" />
+          ))}
+        </div>
+      )}
+      {decisions.error && (
+        <div role="alert" className="card border-red-300 dark:border-red-800">
+          <p className="font-medium text-red-700 dark:text-red-400">Failed to load decisions</p>
+          <p className="mt-1 text-sm text-red-600">{(decisions.error as Error).message}</p>
+        </div>
+      )}
+
       <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
         <div className="card overflow-x-auto p-0">
           <table className="w-full text-sm">
@@ -59,7 +73,7 @@ export function DecisionsPage() {
                 <tr
                   key={d.id}
                   className={`cursor-pointer border-b border-gray-100 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800 ${
-                    selected?.id === d.id ? 'bg-blue-50 dark:bg-blue-950' : ''
+                    selected?.id === d.id ? 'bg-brand-50 dark:bg-brand-500/10' : ''
                   }`}
                   onClick={() => setSelected(d)}
                 >
@@ -110,7 +124,7 @@ export function DecisionsPage() {
                     {selected.files.map((f) => (
                       <li key={f}>
                         <Link
-                          className="font-mono underline hover:text-blue-600"
+                          className="font-mono underline hover:text-brand-600"
                           to={`/repo/${repoId}/why?path=${encodeURIComponent(f)}`}
                         >
                           {f}

@@ -26,7 +26,11 @@ lint:
 	$(PY) -m ruff format --check core api cli mcp_server tests
 	cd web && pnpm lint
 
-demo:
+web-build:
+	cd web && pnpm install && pnpm build
+
+demo: web-build
+	HEIRLOOM_DEMO=1 HEIRLOOM_HOME=./demo $(PY) -m cli.main mcp --http &
 	HEIRLOOM_DEMO=1 HEIRLOOM_HOME=./demo $(PY) -m cli.main serve --port 8000
 
 snapshot:

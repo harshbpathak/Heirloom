@@ -56,4 +56,30 @@ describe('WhyCardView', () => {
     render(<WhyCardView card={{ ...card, holders: [] }} />);
     expect(screen.getByText(/unknown \(no blame data/)).toBeInTheDocument();
   });
+
+  it('shows initials badge for each holder', () => {
+    render(<WhyCardView card={card} />);
+    // InitialsBadge renders "AC" for "Alice Chen"
+    expect(screen.getByLabelText('Alice Chen')).toBeInTheDocument();
+    expect(screen.getByLabelText('Alice Chen').textContent).toBe('AC');
+  });
+
+  it('renders score bar for each impact item', () => {
+    render(<WhyCardView card={card} />);
+    // role="meter" for the score bar
+    const meters = screen.getAllByRole('meter');
+    // At least one meter for impact score
+    const impactMeter = meters.find((m) => m.getAttribute('aria-label')?.startsWith('Impact score'));
+    expect(impactMeter).toBeTruthy();
+  });
+
+  it('renders activity chart when activity data is present', () => {
+    render(<WhyCardView card={card} />);
+    expect(screen.getByRole('img', { name: /Commits per month/ })).toBeInTheDocument();
+  });
+
+  it('omits activity chart when activity is empty', () => {
+    render(<WhyCardView card={{ ...card, activity: [] }} />);
+    expect(screen.queryByRole('img', { name: /Commits per month/ })).not.toBeInTheDocument();
+  });
 });

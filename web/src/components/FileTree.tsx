@@ -20,8 +20,8 @@ export function FileTree({
         onClick={() => node.path && onSelect(node.path)}
         className={`block w-full truncate rounded px-2 py-0.5 text-left text-sm ${
           isSelected
-            ? 'bg-blue-100 font-medium dark:bg-blue-950'
-            : 'hover:bg-gray-100 dark:hover:bg-gray-800'
+            ? 'bg-brand-100 font-medium text-brand-700 dark:bg-brand-500/20 dark:text-brand-400'
+            : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
         }`}
         style={{ paddingLeft: `${depth * 12 + 8}px` }}
         title={node.path}

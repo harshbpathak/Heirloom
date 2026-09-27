@@ -19,6 +19,32 @@ export function RepoOverviewPage() {
   const repo = repos.data?.find((r) => r.id === repoId);
   const stats = repo?.stats;
 
+  if (repos.isLoading) {
+    return (
+      <div className="space-y-6" aria-busy="true">
+        <div className="skeleton h-7 w-48" />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="card py-3">
+              <div className="skeleton mb-1 h-3 w-16" />
+              <div className="skeleton h-6 w-12" />
+            </div>
+          ))}
+        </div>
+        <div className="card"><div className="skeleton h-64 w-full" /></div>
+      </div>
+    );
+  }
+
+  if (repos.error) {
+    return (
+      <div role="alert" className="card border-red-300 dark:border-red-800">
+        <p className="font-medium text-red-700 dark:text-red-400">Failed to load repository</p>
+        <p className="mt-1 text-sm text-red-600">{(repos.error as Error).message}</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-4">
@@ -63,7 +89,7 @@ export function RepoOverviewPage() {
           <h2 className="text-sm font-semibold">Most concentrated people</h2>
           <div className="mt-2 flex flex-wrap gap-2">
             {risk.data.top_people.map((p) => (
-              <span key={p.name} className="rounded bg-gray-100 px-2 py-0.5 text-sm dark:bg-gray-800">
+              <span key={p.name} className="rounded-full bg-gray-100 px-3 py-0.5 text-sm dark:bg-gray-800">
                 {p.name} — {p.files_over_40pct} files &gt;40%
               </span>
             ))}
@@ -75,7 +101,7 @@ export function RepoOverviewPage() {
         <div className="mb-3 flex flex-wrap items-center gap-3">
           <h2 className="font-semibold">Bus Factor Map</h2>
           <label htmlFor="author-filter" className="ml-auto text-sm text-gray-600 dark:text-gray-300">
-            “If this person left”:
+            "If this person left":
           </label>
           <select
             id="author-filter"
@@ -91,7 +117,14 @@ export function RepoOverviewPage() {
             ))}
           </select>
         </div>
-        {tree.isLoading && <p>Loading map…</p>}
+        {tree.isLoading && (
+          <div className="skeleton h-64 w-full" aria-label="Loading bus factor map…" />
+        )}
+        {tree.error && (
+          <p role="alert" className="text-sm text-red-600">
+            Could not load map: {(tree.error as Error).message}
+          </p>
+        )}
         {tree.data && (
           <BusFactorMap
             tree={tree.data}
@@ -108,7 +141,7 @@ function Stat({ label, value }: { label: string; value: number | string | undefi
   return (
     <div className="card py-3">
       <div className="text-xs text-gray-500">{label}</div>
-      <div className="text-lg font-semibold">{value ?? 'unknown'}</div>
+      <div className="text-lg font-semibold">{value ?? '—'}</div>
     </div>
   );
 }

@@ -3,6 +3,9 @@
 Imports the same core library as the CLI and API — no duplicated logic.
 Every tool validates paths, and every response stays under ~2000 tokens by
 truncating lists and saying how many items were cut.
+
+Logs go to **stderr** — stdout is the MCP JSON-RPC protocol channel and any
+stray bytes there will break agents using stdio transport.
 """
 
 from __future__ import annotations
@@ -17,6 +20,9 @@ from core.config import get_settings
 from core.db import list_repo_ids, repo_id_from_source, session_for
 from core.errors import HeirloomError
 from core.llm.provider import get_provider
+from core.logging_config import configure_logging
+
+configure_logging()
 
 mcp = FastMCP(
     "heirloom",

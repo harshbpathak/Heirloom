@@ -82,7 +82,22 @@ export function TrailsPage() {
         </button>
       </form>
 
-      {trail.isLoading && <p>Building trail…</p>}
+      {trail.isLoading && (
+        <div className="space-y-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="card space-y-2">
+              <div className="skeleton h-4 w-1/3" />
+              <div className="skeleton h-8 w-full" />
+            </div>
+          ))}
+        </div>
+      )}
+      {trail.error && (
+        <div role="alert" className="card border-red-300 dark:border-red-800">
+          <p className="font-medium text-red-700 dark:text-red-400">Failed to build trail</p>
+          <p className="mt-1 text-sm text-red-600">{(trail.error as Error).message}</p>
+        </div>
+      )}
       {trail.data && trail.data.steps.length === 0 && (
         <p className="text-gray-500">
           No relevant files found{activeTopic ? ` for "${activeTopic}"` : ''}.
@@ -110,7 +125,7 @@ export function TrailsPage() {
                       <span className="font-semibold">{i + 1}.</span>
                       <Link
                         to={`/repo/${repoId}/why?path=${encodeURIComponent(s.path)}`}
-                        className="break-all font-mono text-sm underline hover:text-blue-600"
+                        className="break-all font-mono text-sm underline hover:text-brand-600"
                       >
                         {s.path}
                       </Link>

@@ -13,3 +13,30 @@ Choices made while building Heirloom. Each one is also a record in `.heirloom/de
 - **Host the web UI on Vercel and the API as a container.** Serverless functions can't do those reliably, so the static UI goes on Vercel and proxies /api to a long-lived container (Render). _Rejected:_ API on Vercel functions: no git binary and no background work.
 
 Demo repos: `pallets/click` (Python) is the measured example used in the README, submission and video.
+
+## Demo snapshot repos (spec F11)
+
+**Decision:** use `pallets/click`, `expressjs/express` and `sindresorhus/ky`
+as the three demo repos.
+
+**Reasoning:**
+
+| Repo | Language | Why it was chosen |
+|---|---|---|
+| `pallets/click` | Python | Active project with ~2 000 meaningful commits, good commit messages that produce real decisions, medium codebase size (≈ 8 000 LOC). Python is Heirloom's own language so the Why Cards are maximally rich. |
+| `expressjs/express` | JavaScript | The most-starred Node.js web framework; large commit history, well-known to any web developer watching the demo, contrasts click in language and domain. |
+| `sindresorhus/ky` | TypeScript | Small, focused fetch-wrapper (≈ 1 500 LOC); shows that Heirloom works on tiny repos and gives a clear TypeScript example. Contrasts both other repos in size and style. |
+
+Together the three repos cover three sizes (small / medium / large), three
+languages (TypeScript / JavaScript / Python), and two domains (CLI tooling /
+HTTP). The difference in size makes the Bus Factor Map visually interesting
+even in a short demo.
+
+**Alternatives considered:**
+- `django/django` — too large; ingest of 15 000+ commits well exceeds the
+  2 000-commit cap and the resulting database is over GitHub's 50 MB warning.
+- `axios/axios` instead of `ky` — similar size, but axios is JavaScript while
+  ky is TypeScript, which adds better language coverage.
+- `fastapi/fastapi` — another good Python option, but `click` is a direct
+  dependency of Heirloom itself which makes the demo self-referential in a
+  useful way.
