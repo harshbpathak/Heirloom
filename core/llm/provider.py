@@ -73,10 +73,8 @@ class WatsonxProvider(LLMProvider):
     def _get_model(self) -> Any:
         if self._model is None:
             try:
-                from ibm_watsonx_ai import Credentials  # type: ignore[import-not-found]
-                from ibm_watsonx_ai.foundation_models import (
-                    ModelInference,  # type: ignore[import-not-found]
-                )
+                from ibm_watsonx_ai import Credentials
+                from ibm_watsonx_ai.foundation_models import ModelInference
             except ImportError as exc:
                 raise LLMError(
                     "ibm-watsonx-ai is not installed; install with `pip install heirloom[watsonx]`"
