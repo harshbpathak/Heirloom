@@ -358,3 +358,33 @@ Index of all recorded decisions for a repo, in reverse chronological order.
 2. **To understand ripple effects:** call `impact_if_changed` to see which other files will need updating.
 3. **After making a design choice:** call `record_decision` to persist the reasoning so the next developer doesn't have to re-discover it.
 4. **To find existing precedent:** call `search_decisions` before re-implementing something that may already have a recorded rationale.
+
+## Client configs
+
+Run `heirloom ingest .` in the project first, and make sure `heirloom` is on the PATH (activate the virtualenv, or use the full path to `.venv/Scripts/heirloom`, `.venv/bin/heirloom` on macOS/Linux). Set `HEIRLOOM_REPO` when several repos are ingested.
+
+**IBM Bob**: `.bob/mcp.json` in the workspace (already in this repo):
+
+```json
+{ "mcpServers": { "heirloom": { "command": "heirloom", "args": ["mcp"] } } }
+```
+
+**Claude Desktop**: `claude_desktop_config.json`:
+
+```json
+{ "mcpServers": { "heirloom": { "command": "heirloom", "args": ["mcp"], "env": { "HEIRLOOM_REPO": "/path/to/your/repo" } } } }
+```
+
+**Cursor**: `.cursor/mcp.json` in the project:
+
+```json
+{ "mcpServers": { "heirloom": { "command": "heirloom", "args": ["mcp"] } } }
+```
+
+**VS Code** (Copilot agent mode): `.vscode/mcp.json`:
+
+```json
+{ "servers": { "heirloom": { "type": "stdio", "command": "heirloom", "args": ["mcp"] } } }
+```
+
+**Over HTTP**: run `heirloom mcp --http --port 8765` and point the client at `http://localhost:8765/mcp`.
