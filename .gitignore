@@ -1,0 +1,80 @@
+﻿# Virtual environments
+.venv/
+*.venv/
+venv/
+env/
+ENV/
+
+# Python build / distribution
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+wheels/
+sdist/
+.eggs/
+MANIFEST
+
+# Installer / pip
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Testing & coverage
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+
+# Type checkers
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pytype/
+
+# Linters / formatters
+.ruff_cache/
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+*.env
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# Bob / session data
+.bob/
+bob_sessions/
+
+# OS artefacts
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Demo / local scratch
+demo/

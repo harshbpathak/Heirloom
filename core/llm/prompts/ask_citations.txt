@@ -1,0 +1,4 @@
+Answer the question using only the decisions provided. Each decision has an id.
+Cite every claim with [id]. If the decisions do not answer the question, say
+"Heirloom has no recorded reasoning for this." Keep the answer under 150 words.
+Return JSON: {"answer": "...", "citations": ["id", ...]}

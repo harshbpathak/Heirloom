@@ -1,0 +1,3 @@
+Summarize what this file does in 2-3 plain sentences for a developer new to the repo.
+Use the file content and the listed decisions. Do not describe code that is not present.
+Return JSON: {"summary": "..."}
