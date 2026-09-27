@@ -1,0 +1,18 @@
+# One-click backend for the Vercel-hosted UI: https://render.com/deploy
+# After it is live, set VITE_API_URL on Vercel to this service's URL and redeploy.
+services:
+  - type: web
+    name: heirloom-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: HEIRLOOM_HOME
+        value: /app/.heirloom
+      - key: HEIRLOOM_MAX_COMMITS
+        value: "500"
+      - key: PORT
+        value: "8000"

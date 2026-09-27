@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { Link, NavLink, Outlet, useParams } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation, useParams } from 'react-router-dom';
 import { api } from '../api';
 
 /** Heirloom logo: pot glyph in a sun-coloured box, brutalist wordmark. */
@@ -36,6 +36,12 @@ export function Layout() {
   const { repoId } = useParams();
   const [dark, setDark] = useState(() => document.documentElement.classList.contains('dark'));
   const health = useQuery({ queryKey: ['health'], queryFn: api.health });
+  const { pathname } = useLocation();
+
+  // Each route is its own page: start at the top when it changes.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark);
@@ -55,7 +61,11 @@ export function Layout() {
         { to: `/repo/${repoId}/decisions`, label: 'Decisions' },
         { to: `/repo/${repoId}/people`, label: 'People' },
       ]
-    : [];
+    : [
+        { to: '/how', label: 'How it works' },
+        { to: '/roles', label: 'Roles' },
+        { to: '/repos', label: 'Repositories' },
+      ];
 
   return (
     <div className="min-h-screen">
@@ -107,10 +117,10 @@ export function Layout() {
                 <ArrowIcon />
               </Link>
             ) : (
-              <a href="#ingest" className="brutal-button hidden sm:inline-flex">
+              <Link to="/repos" className="brutal-button hidden sm:inline-flex">
                 Ingest a repo
                 <ArrowIcon />
-              </a>
+              </Link>
             )}
           </div>
         </div>
@@ -133,6 +143,15 @@ export function Layout() {
           ))}
         </div>
       </div>
+
+      {health.isError && (
+        <div
+          role="alert"
+          className="border-b-[3px] border-ink bg-coral px-5 py-3 text-center text-[11px] font-black uppercase tracking-[0.16em] text-[#1d1626]"
+        >
+          Backend not connected. {(health.error as Error).message}
+        </div>
+      )}
 
       <main className="mx-auto max-w-[1200px] px-5 py-8 sm:px-8">
         <Outlet />

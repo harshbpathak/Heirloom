@@ -3,8 +3,11 @@ import { Layout } from './components/Layout';
 import { AskPage } from './pages/AskPage';
 import { DecisionsPage } from './pages/DecisionsPage';
 import { HomePage } from './pages/HomePage';
+import { HowItWorksPage } from './pages/HowItWorksPage';
 import { PeoplePage } from './pages/PeoplePage';
 import { RepoOverviewPage } from './pages/RepoOverviewPage';
+import { ReposPage } from './pages/ReposPage';
+import { RolesPage } from './pages/RolesPage';
 import { TrailsPage } from './pages/TrailsPage';
 import { WhyCardPage } from './pages/WhyCardPage';
 
@@ -14,6 +17,9 @@ export default function App() {
     <Routes>
       <Route element={<Layout />}>
         <Route path="/" element={<HomePage />} />
+        <Route path="/how" element={<HowItWorksPage />} />
+        <Route path="/roles" element={<RolesPage />} />
+        <Route path="/repos" element={<ReposPage />} />
         <Route path="/repo/:repoId" element={<RepoOverviewPage />} />
         <Route path="/repo/:repoId/why" element={<WhyCardPage />} />
         <Route path="/repo/:repoId/trails" element={<TrailsPage />} />
