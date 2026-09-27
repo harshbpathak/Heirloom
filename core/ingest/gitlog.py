@@ -35,7 +35,9 @@ def read_git_log(
     (used for incremental re-ingestion). Merge commits are included but
     carry no numstat lines.
     """
-    fmt = FIELD_SEP.join(["%H", "%an", "%ae", "%aI", "%B"]) + RECORD_SEP
+    # The record separator LEADS each record so a commit's numstat lines
+    # (printed after the format string) stay inside the same record.
+    fmt = RECORD_SEP + FIELD_SEP.join(["%H", "%an", "%ae", "%aI", "%B"])
     cmd = ["git", "log", f"--max-count={max_commits}", f"--pretty=format:{fmt}", "--numstat"]
     if since:
         cmd.append(f"--since={since}")
@@ -115,9 +117,13 @@ def _normalize_numstat_path(path: str) -> str:
 def head_commit(repo_path: Path) -> str | None:
     """Return the current HEAD hash, or None for an empty repo."""
     try:
-        out = subprocess.run(
-            ["git", "rev-parse", "HEAD"], cwd=repo_path, capture_output=True, check=True
-        ).stdout.decode().strip()
+        out = (
+            subprocess.run(
+                ["git", "rev-parse", "HEAD"], cwd=repo_path, capture_output=True, check=True
+            )
+            .stdout.decode()
+            .strip()
+        )
         return out or None
     except subprocess.CalledProcessError:
         return None
@@ -126,9 +132,16 @@ def head_commit(repo_path: Path) -> str | None:
 def default_branch(repo_path: Path) -> str:
     """Best-effort current branch name, defaulting to ``main``."""
     try:
-        out = subprocess.run(
-            ["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=repo_path, capture_output=True, check=True
-        ).stdout.decode().strip()
+        out = (
+            subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                cwd=repo_path,
+                capture_output=True,
+                check=True,
+            )
+            .stdout.decode()
+            .strip()
+        )
         return out or "main"
     except subprocess.CalledProcessError:
         return "main"
