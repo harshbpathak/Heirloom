@@ -144,6 +144,15 @@ export function Layout() {
         </div>
       </div>
 
+      {health.isError && (
+        <div
+          role="alert"
+          className="border-b-[3px] border-ink bg-coral px-5 py-3 text-center text-[11px] font-black uppercase tracking-[0.16em] text-[#1d1626]"
+        >
+          Backend not connected. {(health.error as Error).message}
+        </div>
+      )}
+
       <main className="mx-auto max-w-[1200px] px-5 py-8 sm:px-8">
         <Outlet />
       </main>

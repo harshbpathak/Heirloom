@@ -132,6 +132,15 @@ mypy core
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md).
 
+## Deploying
+
+The UI is static; the API is a Python process that needs `git` and a disk. Host them separately:
+
+1. **API**: deploy the `Dockerfile` (a `render.yaml` is included for [Render](https://render.com/deploy); Railway and Fly work the same way). Set `CORS_ORIGINS` to your UI origin, or `*`.
+2. **UI on Vercel**: import the repo with root directory `web`. Add the environment variable `VITE_API_URL=https://<your-api-host>` and redeploy. `web/vercel.json` rewrites every route to `index.html`.
+
+If the UI shows a red "Backend not connected" banner, `VITE_API_URL` is unset or the API is down.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).

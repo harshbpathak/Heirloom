@@ -135,11 +135,40 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Where the API lives. Empty (the default) means same origin, which is what
+ * `heirloom serve` and the Vite dev proxy provide. A static deploy (Vercel,
+ * Netlify) sets `VITE_API_URL` to the backend's public URL at build time.
+ */
+export const API_BASE = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '');
+
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
-  const resp = await fetch(url, init);
-  const body = await resp.json();
+  let resp: Response;
+  try {
+    resp = await fetch(`${API_BASE}${url}`, init);
+  } catch {
+    throw new ApiError(
+      'unreachable',
+      API_BASE
+        ? `Cannot reach the Heirloom API at ${API_BASE}. Is the backend running?`
+        : 'Cannot reach the Heirloom API. Run `heirloom serve`, or set VITE_API_URL to a deployed backend.',
+    );
+  }
+  let body: unknown = null;
+  try {
+    body = await resp.json();
+  } catch {
+    // A static host answers /api with HTML (its 404 page), not JSON.
+    throw new ApiError(
+      'unreachable',
+      'The Heirloom API is not available on this host. Set VITE_API_URL to a deployed backend and rebuild.',
+    );
+  }
   if (!resp.ok) {
-    const err = body?.error ?? { code: 'unknown', message: resp.statusText };
+    const err = (body as { error?: { code: string; message: string } } | null)?.error ?? {
+      code: 'unknown',
+      message: resp.statusText,
+    };
     throw new ApiError(err.code, err.message);
   }
   return body as T;

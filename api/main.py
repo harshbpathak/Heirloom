@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -40,9 +41,22 @@ app = FastAPI(
     title="Heirloom API", version="0.1.0", docs_url="/api/docs", openapi_url="/api/openapi.json"
 )
 
+
+def _cors_origins() -> list[str]:
+    """Origins allowed to call the API from a browser.
+
+    ``CORS_ORIGINS`` is a comma-separated list (``*`` allows any origin, which is
+    fine here: the API sets no cookies). The Vite dev server is always allowed.
+    """
+    extra = [o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()]
+    if "*" in extra:
+        return ["*"]
+    return ["http://localhost:5173", "http://127.0.0.1:5173", *extra]
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=_cors_origins(),
     allow_methods=["*"],
     allow_headers=["*"],
 )
