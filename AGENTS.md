@@ -34,7 +34,7 @@ ruff check core api cli mcp_server tests && ruff format --check core api cli mcp
 
 - Python 3.11+, type hints everywhere, and a docstring on every public function. Format with `ruff format` (black-compatible). Lint with `ruff check`. Run mypy strict on `core/`.
 - TypeScript runs in strict mode. Don't use `any` without a comment explaining why. Lint with ESLint.
-- Commits follow Conventional Commits: `feat:`, `fix:`, `test:`, `docs:`, `chore:`.
+- Commit messages are short and plain, with no `feat:`/`chore:` prefixes (for example "Add PR guard action"). The project owner chose this over the Conventional Commits style in spec §12.
 - Errors are custom exceptions in `core/errors.py`, and the API maps them to `{"error": {"code", "message"}}`.
 - Every LLM feature needs a deterministic fallback. The app must run with zero API keys.
 - Never invent data. If a value is unknown, return or show "unknown" with the reason.
