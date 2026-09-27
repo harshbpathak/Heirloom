@@ -15,8 +15,16 @@ from core.llm.provider import LLMProvider, cached_complete_json
 from core.models.schemas import ExtractionResult
 
 CANDIDATE_KEYWORDS = (
-    "because", "instead", "so that", "revert", "workaround", "migrate",
-    "replace", "deprecate", "fix race", "perf",
+    "because",
+    "instead",
+    "so that",
+    "revert",
+    "workaround",
+    "migrate",
+    "replace",
+    "deprecate",
+    "fix race",
+    "perf",
 )
 REASONING_MARKERS = ("because", "so that", "instead of", "to avoid")
 MIN_COMMIT_LENGTH = 60
@@ -68,6 +76,31 @@ def is_candidate(item: EvidenceCandidate) -> bool:
 
 
 _SENTENCE_RE = re.compile(r"(?<=[.!?])\s+")
+_ADR_NUMBER_RE = re.compile(r"^(?:ADR[-\s]*)?\d+[.:)]?\s+", re.IGNORECASE)
+_BOILERPLATE_SECTIONS = {"status", "context", "decision", "consequences", "reasoning"}
+
+
+def _strip_markdown(text: str) -> str:
+    """Flatten an ADR/doc for heuristic extraction.
+
+    The first heading becomes the title line (minus '#' and any 'N.' ADR
+    number); section headings and YAML front matter are dropped.
+    """
+    body = re.sub(r"^---\n.*?\n---\n", "", text.strip(), flags=re.DOTALL)
+    lines: list[str] = []
+    title: str | None = None
+    for raw in body.splitlines():
+        line = raw.strip()
+        if line.startswith("#"):
+            heading = line.lstrip("#").strip()
+            if title is None:
+                title = _ADR_NUMBER_RE.sub("", heading)
+            elif heading.lower() not in _BOILERPLATE_SECTIONS:
+                lines.append(heading + ".")
+            continue
+        if line and line.lower() not in ("accepted", "proposed", "superseded"):
+            lines.append(line)
+    return "\n".join(([title] if title else []) + lines).strip()
 
 
 def _sentences(text: str) -> list[str]:
@@ -83,17 +116,23 @@ def heuristic_extract(item: EvidenceCandidate) -> DraftDecision | None:
     Reasoning = sentences containing because/so that/instead of/to avoid.
     Confidence: high for ADRs (spec F2 acceptance), low otherwise.
     """
-    text = item.text.strip()
+    text = _strip_markdown(item.text) if item.type in ("adr", "doc") else item.text.strip()
     if not text:
         return None
     first_line = text.split("\n", 1)[0].strip()
     title = first_line[:MAX_TITLE] if first_line else text[:MAX_TITLE]
-    body = text[len(first_line):].strip() or text
+    body = text[len(first_line) :].strip() or text
     sentences = _sentences(body)
     summary = " ".join(sentences[:2])[:500]
+    # The title line is its own sentence even without a trailing period; body
+    # sentences come first so the reasoning adds information beyond the title.
+    body_only = text[len(first_line) :].strip()
+    candidates = _sentences(body_only) + [first_line] if body_only else [first_line]
     reasoning_sentences = [
-        s for s in _sentences(text) if any(marker in s.lower() for marker in REASONING_MARKERS)
+        s for s in candidates if any(marker in s.lower() for marker in REASONING_MARKERS)
     ]
+    if body_only and len(reasoning_sentences) > 1:
+        reasoning_sentences = [s for s in reasoning_sentences if s != first_line]
     reasoning = " ".join(reasoning_sentences)[:1000]
     if item.type in ("commit", "pull_request") and not reasoning and len(text) <= MIN_COMMIT_LENGTH:
         return None
