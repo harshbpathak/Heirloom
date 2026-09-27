@@ -57,7 +57,13 @@ def fetch_merged_prs(
         while len(results) < max_prs:
             resp = http.get(
                 f"/repos/{owner}/{name}/pulls",
-                params={"state": "closed", "per_page": 100, "page": page, "sort": "updated", "direction": "desc"},
+                params={
+                    "state": "closed",
+                    "per_page": 100,
+                    "page": page,
+                    "sort": "updated",
+                    "direction": "desc",
+                },
             )
             resp.raise_for_status()
             batch = resp.json()
@@ -66,7 +72,9 @@ def fetch_merged_prs(
             for pr in batch:
                 if not pr.get("merged_at"):
                     continue
-                merged = datetime.fromisoformat(pr["merged_at"].replace("Z", "+00:00")).replace(tzinfo=None)
+                merged = datetime.fromisoformat(pr["merged_at"].replace("Z", "+00:00")).replace(
+                    tzinfo=None
+                )
                 files = _fetch_pr_files(http, owner, name, pr["number"])
                 results.append(
                     PullRequestEvidence(
