@@ -1,0 +1,20 @@
+name: Heirloom PR guard
+
+on:
+  pull_request:
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  pr-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: ./action
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
