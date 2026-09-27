@@ -96,7 +96,9 @@ class Commit(Base):
 
     hash: Mapped[str] = mapped_column(String, primary_key=True)
     repo_id: Mapped[str] = mapped_column(ForeignKey("repos.id"), index=True)
-    author_id: Mapped[int | None] = mapped_column(ForeignKey("authors.id"), index=True, nullable=True)
+    author_id: Mapped[int | None] = mapped_column(
+        ForeignKey("authors.id"), index=True, nullable=True
+    )
     date: Mapped[datetime] = mapped_column(DateTime)
     message: Mapped[str] = mapped_column(Text)
 
@@ -159,7 +161,9 @@ class Evidence(Base):
     url: Mapped[str | None] = mapped_column(String, nullable=True)
     text: Mapped[str] = mapped_column(Text)
     date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    author_id: Mapped[int | None] = mapped_column(ForeignKey("authors.id"), index=True, nullable=True)
+    author_id: Mapped[int | None] = mapped_column(
+        ForeignKey("authors.id"), index=True, nullable=True
+    )
 
     __table_args__ = (UniqueConstraint("repo_id", "type", "ref", name="uq_evidence_repo_type_ref"),)
 
@@ -176,7 +180,7 @@ class Decision(Base):
     reasoning: Mapped[str] = mapped_column(Text, default="")
     alternatives: Mapped[str | None] = mapped_column(Text, nullable=True)
     confidence: Mapped[str] = mapped_column(String, default="low")  # high|medium|low
-    created_at: Mapped[datetime] = mapped_column(DateTime)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     source: Mapped[str] = mapped_column(String, default="extracted")  # extracted|manual
     skill_hash: Mapped[str | None] = mapped_column(String, nullable=True)
     author: Mapped[str | None] = mapped_column(String, nullable=True)
