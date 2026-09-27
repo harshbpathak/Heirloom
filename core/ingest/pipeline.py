@@ -16,7 +16,7 @@ from pathlib import Path
 
 import structlog
 import yaml
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 
 from core.analysis.coupling import compute_coupling
 from core.analysis.entry_points import detect_entry_points
@@ -25,7 +25,7 @@ from core.analysis.ownership import (
     RECENT_WINDOW_DAYS,
     bus_factor,
     compute_ownership,
-    is_at_risk,
+    is_inactive,
     merge_identities,
 )
 from core.config import Settings, get_settings
@@ -55,6 +55,7 @@ from core.models.db_models import (
     Ownership,
     Repo,
 )
+from core.timeutil import utcnow
 
 log = structlog.get_logger()
 
@@ -133,7 +134,9 @@ def ingest_repo(
         # ---- Walk files -------------------------------------------------
         report(*_STAGES[1])
         walked = walk_repo(repo_path)
-        existing_files = {f.path: f for f in session.scalars(select(File).where(File.repo_id == repo_id))}
+        existing_files = {
+            f.path: f for f in session.scalars(select(File).where(File.repo_id == repo_id))
+        }
         walked_paths = {w.path for w in walked}
         for w in walked:
             row = existing_files.get(w.path)
@@ -165,20 +168,32 @@ def ingest_repo(
             identity = identities.get((entry.author_name, entry.author_email))
             author_id = author_ids.get(identity.canonical_name) if identity else None
             session.add(
-                Commit(hash=entry.hash, repo_id=repo_id, author_id=author_id, date=entry.date, message=entry.message)
+                Commit(
+                    hash=entry.hash,
+                    repo_id=repo_id,
+                    author_id=author_id,
+                    date=entry.date,
+                    message=entry.message,
+                )
             )
             for path, added, deleted in entry.files:
                 changed_paths.add(path)
                 fid = file_ids.get(path)
                 if fid is not None:
-                    session.merge(CommitFile(commit_hash=entry.hash, file_id=fid, added=added, deleted=deleted))
+                    session.merge(
+                        CommitFile(
+                            commit_hash=entry.hash, file_id=fid, added=added, deleted=deleted
+                        )
+                    )
         session.flush()
 
         # ---- Blame (only analyzed languages; incremental = changed only) --
         report(*_STAGES[3])
         blame_targets = [
-            w.path for w in walked
-            if w.language in ANALYZED_LANGUAGES and (previous_head is None or w.path in changed_paths)
+            w.path
+            for w in walked
+            if w.language in ANALYZED_LANGUAGES
+            and (previous_head is None or w.path in changed_paths)
         ]
         blame_data: dict[str, dict[tuple[str, str], int]] = {}
         for i, path in enumerate(blame_targets):
@@ -195,14 +210,20 @@ def ingest_repo(
                 continue
             for c in extract_intent_comments(repo_path, w.path, w.language):
                 comment_evidence.append(
-                    EvidenceCandidate(type="code_comment", ref=f"{c.path}:{c.line}", text=c.text, files=[c.path])
+                    EvidenceCandidate(
+                        type="code_comment", ref=f"{c.path}:{c.line}", text=c.text, files=[c.path]
+                    )
                 )
 
         doc_evidence: list[EvidenceCandidate] = []
+        adr_candidates: list[EvidenceCandidate] = []
         for doc in load_docs(repo_path):
-            doc_evidence.append(
-                EvidenceCandidate(type="adr" if doc.type == "adr" else "doc", ref=doc.path, text=doc.text, files=[])
+            cand = EvidenceCandidate(
+                type="adr" if doc.type == "adr" else "doc", ref=doc.path, text=doc.text, files=[]
             )
+            # ADRs are always decision candidates (F2 step 1); plain docs are
+            # stored as evidence but not mined for decisions.
+            (adr_candidates if cand.type == "adr" else doc_evidence).append(cand)
         # Heirloom's own decision records round-trip as ADR evidence (F9).
         record_candidates: list[EvidenceCandidate] = []
         for rel_path, record in load_decision_records(repo_path):
@@ -248,14 +269,34 @@ def ingest_repo(
             for e in new_entries
         ]
 
-        all_candidates = commit_candidates + pr_candidates + comment_evidence + record_candidates
-        evidence_ids = _persist_evidence(session, repo_id, all_candidates + doc_evidence, author_ids={})
+        # Structured .heirloom records go before raw ADR files so the richer
+        # version wins when both point at the same evidence.
+        adr_candidates = [c for c in adr_candidates if not c.ref.startswith(".heirloom/")]
+        all_candidates = (
+            commit_candidates
+            + pr_candidates
+            + comment_evidence
+            + record_candidates
+            + adr_candidates
+        )
+        evidence_ids = _persist_evidence(
+            session, repo_id, all_candidates + doc_evidence, author_ids={}
+        )
 
         # ---- Structure analysis -------------------------------------------
         report(*_STAGES[5])
         _analyze_structure(session, repo_id, repo_path, walked, file_ids)
         _analyze_coupling(session, repo_id, file_ids)
-        _analyze_ownership(session, repo_id, repo_path, walked, file_ids, blame_data, identities, author_ids_by_name=author_ids)
+        _analyze_ownership(
+            session,
+            repo_id,
+            repo_path,
+            walked,
+            file_ids,
+            blame_data,
+            identities,
+            author_ids_by_name=author_ids,
+        )
 
         # ---- Decisions ------------------------------------------------------
         report(*_STAGES[6])
@@ -264,7 +305,7 @@ def ingest_repo(
         _persist_decisions(session, repo_id, drafts, evidence_ids, file_ids)
 
         repo.last_ingested_commit = current_head
-        repo.ingested_at = datetime.utcnow()
+        repo.ingested_at = utcnow()
         repo.stats_json = json.dumps(_compute_stats(session, repo_id))
         report(*_STAGES[7])
 
@@ -306,7 +347,10 @@ def _load_alias_overrides(repo_path: Path) -> dict[str, str]:
 
 def _persist_authors(session, repo_id: str, identities) -> dict[str, int]:
     """Upsert canonical authors; returns canonical_name -> author id."""
-    existing = {a.canonical_name: a for a in session.scalars(select(Author).where(Author.repo_id == repo_id))}
+    existing = {
+        a.canonical_name: a
+        for a in session.scalars(select(Author).where(Author.repo_id == repo_id))
+    }
     result: dict[str, int] = {}
     for identity in {id(v): v for v in identities.values()}.values():
         row = existing.get(identity.canonical_name)
@@ -322,18 +366,25 @@ def _persist_authors(session, repo_id: str, identities) -> dict[str, int]:
     return result
 
 
-def _persist_evidence(session, repo_id: str, candidates: list[EvidenceCandidate], author_ids) -> dict[str, int]:
+def _persist_evidence(
+    session, repo_id: str, candidates: list[EvidenceCandidate], author_ids
+) -> dict[str, int]:
     """Upsert evidence rows; returns 'type:ref' -> evidence id."""
     existing = {
-        (e.type, e.ref): e for e in session.scalars(select(Evidence).where(Evidence.repo_id == repo_id))
+        (e.type, e.ref): e
+        for e in session.scalars(select(Evidence).where(Evidence.repo_id == repo_id))
     }
     for cand in candidates:
         key = (cand.type, cand.ref)
         if key in existing:
             continue
         row = Evidence(
-            repo_id=repo_id, type=cand.type, ref=cand.ref, url=cand.url,
-            text=cand.text[:20_000], date=cand.date,
+            repo_id=repo_id,
+            type=cand.type,
+            ref=cand.ref,
+            url=cand.url,
+            text=cand.text[:20_000],
+            date=cand.date,
         )
         session.add(row)
         existing[key] = row
@@ -341,7 +392,9 @@ def _persist_evidence(session, repo_id: str, candidates: list[EvidenceCandidate]
     return {f"{t}:{r}": row.id for (t, r), row in existing.items()}
 
 
-def _analyze_structure(session, repo_id: str, repo_path: Path, walked, file_ids: dict[str, int]) -> None:
+def _analyze_structure(
+    session, repo_id: str, repo_path: Path, walked, file_ids: dict[str, int]
+) -> None:
     """Imports, fan-in/out, entry points (F3 steps 1, 2, 5)."""
     repo_file_set = {w.path for w in walked}
     edges: set[tuple[int, int]] = set()
@@ -376,7 +429,9 @@ def _analyze_coupling(session, repo_id: str, file_ids: dict[str, int]) -> None:
     """Co-change coupling over the full stored commit history (F3 step 3)."""
     id_to_path = {v: k for k, v in file_ids.items()}
     commit_file_rows = session.execute(
-        select(CommitFile.commit_hash, CommitFile.file_id).join(Commit, Commit.hash == CommitFile.commit_hash).where(Commit.repo_id == repo_id)
+        select(CommitFile.commit_hash, CommitFile.file_id)
+        .join(Commit, Commit.hash == CommitFile.commit_hash)
+        .where(Commit.repo_id == repo_id)
     ).all()
     by_commit: dict[str, list[str]] = {}
     for commit_hash, fid in commit_file_rows:
@@ -389,20 +444,30 @@ def _analyze_coupling(session, repo_id: str, file_ids: dict[str, int]) -> None:
     for pair in pairs:
         a, b = file_ids.get(pair.file_a), file_ids.get(pair.file_b)
         if a is not None and b is not None:
-            session.add(Coupling(file_a_id=a, file_b_id=b, co_changes=pair.co_changes, score=pair.score))
+            session.add(
+                Coupling(file_a_id=a, file_b_id=b, co_changes=pair.co_changes, score=pair.score)
+            )
 
 
 def _analyze_ownership(
-    session, repo_id: str, repo_path: Path, walked, file_ids: dict[str, int],
-    blame_data: dict[str, dict[tuple[str, str], int]], identities, author_ids_by_name: dict[str, int],
+    session,
+    repo_id: str,
+    repo_path: Path,
+    walked,
+    file_ids: dict[str, int],
+    blame_data: dict[str, dict[tuple[str, str], int]],
+    identities,
+    author_ids_by_name: dict[str, int],
 ) -> None:
     """Ownership, bus factor and at-risk flags per file (F4)."""
-    now = datetime.utcnow()
+    now = utcnow()
     cutoff = now - timedelta(days=RECENT_WINDOW_DAYS)
 
     # Recent lines changed and last commit date per (file, canonical author).
     rows = session.execute(
-        select(CommitFile.file_id, Commit.author_id, Commit.date, CommitFile.added, CommitFile.deleted)
+        select(
+            CommitFile.file_id, Commit.author_id, Commit.date, CommitFile.added, CommitFile.deleted
+        )
         .join(Commit, Commit.hash == CommitFile.commit_hash)
         .where(Commit.repo_id == repo_id)
     ).all()
@@ -441,18 +506,57 @@ def _analyze_ownership(
                 author_id = author_row.id
             session.add(
                 Ownership(
-                    file_id=fid, author_id=author_id,
-                    blame_share=share.blame_share, recent_share=share.recent_share,
-                    ownership=share.ownership, last_commit_at=share.last_commit_at,
+                    file_id=fid,
+                    author_id=author_id,
+                    blame_share=share.blame_share,
+                    recent_share=share.recent_share,
+                    ownership=share.ownership,
+                    last_commit_at=share.last_commit_at,
                 )
             )
-        factor = bus_factor(shares)
         file_row = session.get(File, fid)
-        file_row.bus_factor = factor
-        file_row.at_risk = is_at_risk(shares, factor, now)
+        file_row.bus_factor = bus_factor(shares)
+
+    session.flush()
+    _refresh_risk_flags(session, repo_id, now)
 
 
-def _persist_decisions(session, repo_id: str, drafts, evidence_ids: dict[str, int], file_ids: dict[str, int]) -> None:
+def person_last_active(session, repo_id: str) -> dict[int, datetime]:
+    """Latest commit date per author id, anywhere in the repo."""
+    rows = session.execute(
+        select(Commit.author_id, func.max(Commit.date))
+        .where(Commit.repo_id == repo_id)
+        .group_by(Commit.author_id)
+    ).all()
+    return {author_id: last for author_id, last in rows if author_id is not None}
+
+
+def _refresh_risk_flags(session, repo_id: str, now: datetime) -> None:
+    """Recompute at_risk for every file from stored ownership and repo-wide activity.
+
+    Runs over all files (not just re-blamed ones) because an owner can go
+    inactive without touching the file again.
+    """
+    last_active = person_last_active(session, repo_id)
+    top_owner: dict[int, int] = {}
+    for fid, author_id, _ in session.execute(
+        select(Ownership.file_id, Ownership.author_id, Ownership.ownership).order_by(
+            Ownership.ownership.desc()
+        )
+    ).all():
+        top_owner.setdefault(fid, author_id)
+    for file_row in session.scalars(select(File).where(File.repo_id == repo_id)):
+        owner = top_owner.get(file_row.id)
+        file_row.at_risk = (
+            file_row.bus_factor == 1
+            and owner is not None
+            and is_inactive(last_active.get(owner), now)
+        )
+
+
+def _persist_decisions(
+    session, repo_id: str, drafts, evidence_ids: dict[str, int], file_ids: dict[str, int]
+) -> None:
     """Insert extracted decisions, skipping ones whose evidence is already linked."""
     linked_evidence = set(session.scalars(select(DecisionEvidence.evidence_id)))
     for draft in drafts:
@@ -466,7 +570,7 @@ def _persist_decisions(session, repo_id: str, drafts, evidence_ids: dict[str, in
             reasoning=draft.reasoning,
             alternatives=draft.alternatives,
             confidence=draft.confidence,
-            created_at=draft.created_at or datetime.utcnow(),
+            created_at=draft.created_at,  # None = unknown; never invent a date
             source="extracted",
         )
         session.add(decision)
