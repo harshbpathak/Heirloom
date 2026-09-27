@@ -57,7 +57,9 @@ def _has_intent(comment_text: str) -> bool:
     return False
 
 
-def extract_intent_comments(repo_path: Path, rel_path: str, language: str | None) -> list[IntentComment]:
+def extract_intent_comments(
+    repo_path: Path, rel_path: str, language: str | None
+) -> list[IntentComment]:
     """Extract intent comments from one source file."""
     prefixes = COMMENT_PREFIXES.get(language or "", None)
     if prefixes is None:
@@ -72,7 +74,9 @@ def extract_intent_comments(repo_path: Path, rel_path: str, language: str | None
         stripped = line.strip()
         comment_text = _comment_part(stripped, prefixes)
         if comment_text and _has_intent(comment_text):
-            results.append(IntentComment(path=rel_path, line=lineno, text=comment_text.strip()[:500]))
+            results.append(
+                IntentComment(path=rel_path, line=lineno, text=comment_text.strip()[:500])
+            )
     return results
 
 
@@ -80,14 +84,14 @@ def _comment_part(stripped_line: str, prefixes: tuple[str, ...]) -> str | None:
     """Return the comment portion of a line, or None when it has no comment."""
     for prefix in prefixes:
         if stripped_line.startswith(prefix):
-            return stripped_line[len(prefix):]
+            return stripped_line[len(prefix) :]
     # Trailing comments: look for the prefix mid-line (skip strings crudely —
     # good enough for intent mining, false negatives are acceptable).
     for prefix in ("#", "//"):
         if prefix in prefixes:
             idx = stripped_line.find(prefix, 1)
             if idx > 0 and not _inside_quotes(stripped_line, idx):
-                return stripped_line[idx + len(prefix):]
+                return stripped_line[idx + len(prefix) :]
     return None
 
 
