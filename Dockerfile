@@ -6,6 +6,8 @@ COPY core ./core
 COPY api ./api
 COPY cli ./cli
 COPY mcp_server ./mcp_server
+COPY demo ./demo
 RUN pip install --no-cache-dir -e .
+ENV HEIRLOOM_HOME=/app/demo HEIRLOOM_DEMO=1
 EXPOSE 8000
-CMD ["python", "-m", "uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD sh -c "uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000}"
