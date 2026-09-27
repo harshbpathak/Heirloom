@@ -1,4 +1,4 @@
-﻿# Virtual environments
+# Virtual environments
 .venv/
 *.venv/
 venv/
@@ -50,6 +50,7 @@ dmypy.json
 # Database files
 *.db
 *.sqlite
+!demo/*.sqlite
 *.sqlite3
 
 # Logs
@@ -57,8 +58,8 @@ dmypy.json
 logs/
 
 # Bob / session data
-.bob/
-bob_sessions/
+# Bob: mode, skills and mcp.json are committed (spec 7); local outputs are not.
+.bob/artifacts/
 
 # OS artefacts
 .DS_Store
@@ -76,5 +77,14 @@ desktop.ini
 .ipynb_checkpoints/
 *.ipynb
 
-# Demo / local scratch
-demo/
+# Local scratch (demo/ snapshots are committed, spec F11)
+.scratch_home/
+.scratch_repo/
+
+# Node / web
+node_modules/
+web/dist/
+web/*.tsbuildinfo
+
+# Local agent config
+.claude/
