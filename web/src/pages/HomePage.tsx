@@ -110,7 +110,7 @@ export function HomePage() {
               {'\n'}
               <span className="text-mint">Who knows it</span>
               {'\n'}
-              davidism 71% · bus factor <span className="text-coral">1</span> · at risk{'\n'}
+              j.rivera 71% · bus factor <span className="text-coral">1</span> · at risk{'\n'}
               {'\n'}
               <span className="text-mint">If this changes</span>
               {'\n'}
